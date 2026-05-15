@@ -1,0 +1,63 @@
+<h2>Section 1 — Overall Architecture</h2>
+<p class="subtitle">Dual process: NiceGUI UI + FastAPI Service</p>
+
+<div class="mockup">
+  <div class="mockup-header">Data Flow: 原文进，片段出</div>
+  <div class="mockup-body" style="padding:2rem;font-family:monospace;font-size:0.85rem;line-height:1.8">
+
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+      <div style="background:var(--gray-3);padding:0.5rem 1rem;border-radius:8px;text-align:center;min-width:120px">
+        📁 文件上传<br><small>.txt .docx .xlsx</small>
+      </div>
+      <span style="font-size:1.5rem">→</span>
+      <div style="background:var(--blue-1);padding:0.5rem 1rem;border-radius:8px;text-align:center;min-width:120px">
+        🖥 NiceGUI<br><small>:8080</small>
+      </div>
+      <span style="font-size:1.5rem">→</span>
+      <div style="background:var(--green-1);padding:0.5rem 1rem;border-radius:8px;text-align:center;min-width:120px">
+        ⚙ FastAPI<br><small>:8001</small>
+      </div>
+      <span style="font-size:1.5rem">→</span>
+      <div style="background:var(--gray-3);padding:0.5rem 1rem;border-radius:8px;text-align:center;min-width:120px">
+        📊 结果表格
+      </div>
+    </div>
+
+    <div style="border-left:3px solid var(--gray-5);padding-left:1rem;margin-top:1rem">
+      <p style="margin:0.25rem 0"><b>1. UI 收到文件</b> → 解析提取纯文本</p>
+      <p style="margin:0.25rem 0"><b>2. UI 调用</b> <code>POST /api/split</code> <code>{text: "…", params: {…}}</code></p>
+      <p style="margin:0.25rem 0"><b>3. Service 执行</b> 保护块 → 清洗 → 分析 → 拆分 → 回卷</p>
+      <p style="margin:0.25rem 0"><b>4. Service 返回</b> <code>{fragments: […], meta: {…}}</code></p>
+      <p style="margin:0.25rem 0"><b>5. UI 渲染</b> 表格 + 统计摘要</p>
+    </div>
+
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem">
+
+  <div class="section">
+    <h3>NiceGUI 前端 (port 8080)</h3>
+    <ul>
+      <li>文件上传 / 拖拽区域</li>
+      <li>算法参数面板（预留）</li>
+      <li>拆分结果表格（主视图）</li>
+      <li>统计摘要行</li>
+      <li>导出按钮（Excel 下载）</li>
+      <li>服务连接状态指示灯</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h3>FastAPI 服务 (port 8001)</h3>
+    <ul>
+      <li><code>GET /health</code> — 健康检查</li>
+      <li><code>POST /api/split</code> — 分析 + 拆分</li>
+      <li>复用现有 <code>_protection_config</code></li>
+      <li>复用现有 <code>analyze_scored</code></li>
+      <li>复用现有 <code>post-类型拆分</code> 拆分引擎</li>
+      <li>返回 JSON 片段列表</li>
+    </ul>
+  </div>
+
+</div>

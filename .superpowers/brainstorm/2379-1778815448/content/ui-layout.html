@@ -1,0 +1,137 @@
+<h2>Section 3 — UI Page Layout</h2>
+<p class="subtitle">Single-page app, top-down flow</p>
+
+<div class="mockup">
+  <div class="mockup-header">UI.py — 整体布局</div>
+  <div class="mockup-body" style="padding:0;font-size:0.82rem;line-height:1.6">
+
+    <!-- Header -->
+    <div class="mock-nav" style="display:flex;justify-content:space-between;align-items:center">
+      <span><b>法律法规文本拆分系统</b></span>
+      <span style="display:flex;align-items:center;gap:0.5rem">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--green-6);display:inline-block"></span>
+        服务已连接 :8001
+      </span>
+    </div>
+
+    <!-- Zone 1: 输入区 -->
+    <div style="padding:1.5rem;border-bottom:1px solid var(--gray-3)">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem">
+        <span style="font-weight:700;font-size:0.9rem">Zone 1 — 输入</span>
+      </div>
+      <div style="display:flex;gap:1rem">
+        <div class="placeholder" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:80px;border:2px dashed var(--gray-4);border-radius:8px">
+          📂 拖拽文件到此处 或 点击上传<br>
+          <small>.txt .docx .xlsx .pdf</small>
+        </div>
+        <div style="display:flex;flex-direction:column;justify-content:center;gap:0.5rem;min-width:80px;text-align:center">
+          <button class="mock-button" style="margin:0 auto">拆分</button>
+          <small style="color:var(--gray-5)">或 Ctrl+Enter</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 2: 参数区（可折叠） -->
+    <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--gray-3);background:var(--gray-1)">
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <span style="font-weight:700;font-size:0.9rem">Zone 2 — 算法参数</span>
+        <span style="font-size:0.7rem;color:var(--gray-5)">可折叠 | 后续扩展</span>
+      </div>
+      <div style="display:flex;gap:2rem;margin-top:0.5rem">
+        <div>
+          <small>算法</small><br>
+          <span style="padding:0.2rem 0.5rem;border:1px solid var(--gray-4);border-radius:4px">scored ▾</span>
+        </div>
+        <div>
+          <small>拆分类型</small><br>
+          <span style="padding:0.2rem 0.5rem;border:1px solid var(--gray-4);border-radius:4px">自动检测 ▾</span>
+        </div>
+        <div>
+          <small>最小片段字数</small><br>
+          <span style="padding:0.2rem 0.5rem;border:1px solid var(--gray-4);border-radius:4px">10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 3: 摘要栏 -->
+    <div style="padding:0.75rem 1.5rem;border-bottom:1px solid var(--gray-3);display:flex;gap:2rem;font-size:0.85rem">
+      <span><b>字符数：</b>1,234</span>
+      <span><b>片段数：</b>15</span>
+      <span><b>发现类型：</b>条、章、括号</span>
+      <span><b>层级链：</b>章→条</span>
+      <span><b>处理耗时：</b>42ms</span>
+      <span style="margin-left:auto"><button class="mock-button" style="font-size:0.75rem">导出 Excel</button></span>
+    </div>
+
+    <!-- Zone 4: 结果表格 -->
+    <div style="padding:0 1.5rem 1.5rem">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin:1rem 0 0.5rem">
+        <span style="font-weight:700;font-size:0.9rem">Zone 4 — 拆分结果</span>
+      </div>
+      <div style="border:1px solid var(--gray-3);border-radius:8px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+          <thead>
+            <tr style="background:var(--gray-2)">
+              <th style="padding:0.5rem;text-align:left;width:60px">序号</th>
+              <th style="padding:0.5rem;text-align:left">内容</th>
+              <th style="padding:0.5rem;text-align:left;width:80px">类型</th>
+              <th style="padding:0.5rem;text-align:left;width:60px">层级</th>
+              <th style="padding:0.5rem;text-align:left;width:50px">序数</th>
+              <th style="padding:0.5rem;text-align:left;width:60px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top:1px solid var(--gray-3)">
+              <td style="padding:0.5rem">1</td>
+              <td style="padding:0.5rem">第一条 为了规范市场秩序，制定本法。</td>
+              <td style="padding:0.5rem"><span style="background:var(--blue-2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.7rem">条</span></td>
+              <td style="padding:0.5rem">0</td>
+              <td style="padding:0.5rem">1</td>
+              <td style="padding:0.5rem"><small>📋 展开</small></td>
+            </tr>
+            <tr style="border-top:1px solid var(--gray-3);background:var(--gray-1)">
+              <td style="padding:0.5rem">2</td>
+              <td style="padding:0.5rem">第二条 市场准入实行负面清单制度。</td>
+              <td style="padding:0.5rem"><span style="background:var(--blue-2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.7rem">条</span></td>
+              <td style="padding:0.5rem">0</td>
+              <td style="padding:0.5rem">2</td>
+              <td style="padding:0.5rem"><small>📋 展开</small></td>
+            </tr>
+            <tr style="border-top:1px solid var(--gray-3)">
+              <td style="padding:0.5rem">3</td>
+              <td style="padding:0.5rem">第一章 总则</td>
+              <td style="padding:0.5rem"><span style="background:var(--green-2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.7rem">章</span></td>
+              <td style="padding:0.5rem">-</td>
+              <td style="padding:0.5rem">1</td>
+              <td style="padding:0.5rem"><small>📋 展开</small></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem">
+  <div>
+    <h3>交互细节</h3>
+    <ul>
+      <li>拖拽上传 + 点击上传双模式</li>
+      <li>Ctrl+Enter 快捷键触发拆分</li>
+      <li>参数区默认折叠，点击展开</li>
+      <li>结果表格支持"展开"查看完整长文本</li>
+      <li>导出 Excel 按钮（复用 openpyxl）</li>
+      <li>服务断开时，状态灯变红 + 禁用拆分按钮</li>
+    </ul>
+  </div>
+  <div>
+    <h3>待扩展预留位</h3>
+    <ul>
+      <li>Zone 2 参数区：算法选择、拆分类型多选、阈值滑块</li>
+      <li>结果表格列：可加"删除片段"/"合并片段"操作</li>
+      <li>批量处理页签（多文件上传 → 批量 → 批量导出）</li>
+      <li>DB 加载按钮（从数据库按 law_id 拉取）</li>
+    </ul>
+  </div>
+</div>

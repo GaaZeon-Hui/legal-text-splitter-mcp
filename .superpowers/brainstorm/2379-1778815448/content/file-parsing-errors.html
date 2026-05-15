@@ -1,0 +1,82 @@
+<h2>Section 4 — File Parsing & Error Handling</h2>
+<p class="subtitle">上传 → 解析 → 校验 → 发送</p>
+
+<div class="section">
+  <h3>支持的文件格式 & 解析策略</h3>
+  <table style="width:100%">
+    <thead>
+      <tr style="background:var(--gray-2)">
+        <th style="padding:0.5rem;text-align:left">格式</th>
+        <th style="padding:0.5rem;text-align:left">解析方式</th>
+        <th style="padding:0.5rem;text-align:left">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:0.5rem"><code>.txt</code></td>
+        <td style="padding:0.5rem">直接读取 UTF-8 / GBK</td>
+        <td style="padding:0.5rem">自动编码检测（chardet 或逐 trial）</td>
+      </tr>
+      <tr>
+        <td style="padding:0.5rem"><code>.docx</code></td>
+        <td style="padding:0.5rem">python-docx 提取段落文本</td>
+        <td style="padding:0.5rem">按段落用 \n 拼接，忽略格式</td>
+      </tr>
+      <tr>
+        <td style="padding:0.5rem"><code>.xlsx</code></td>
+        <td style="padding:0.5rem">openpyxl 读取内容列</td>
+        <td style="padding:0.5rem">指定列/全部列拼接；可后续支持映射</td>
+      </tr>
+      <tr>
+        <td style="padding:0.5rem"><code>粘贴文本</code></td>
+        <td style="padding:0.5rem">直接使用</td>
+        <td style="padding:0.5rem">textarea 输入，优先于文件上传</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>解析流程</h3>
+  <div style="border-left:3px solid var(--gray-5);padding-left:1rem;font-size:0.9rem;line-height:1.8">
+    <p style="margin:0.25rem 0">1. 用户上传文件 → UI 检查扩展名（白名单：.txt .docx .xlsx）</p>
+    <p style="margin:0.25rem 0">2. 调对应解析器提取纯文本</p>
+    <p style="margin:0.25rem 0">3. 文本校验：非空 + 长度 &lt; 10MB（防超大文件）</p>
+    <p style="margin:0.25rem 0">4. 填充到隐藏的 text 变量中 → POST /api/split</p>
+    <p style="margin:0.25rem 0">5. 等待响应 → 成功则跳转结果页；失败则主页面展示错误</p>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem">
+  <div>
+    <h3>错误场景 & 处理</h3>
+    <table style="width:100%;font-size:0.85rem">
+      <tr><td style="padding:0.25rem 0.5rem"><b>场景</b></td><td style="padding:0.25rem 0.5rem"><b>UI 表现</b></td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">格式不支持</td><td style="padding:0.25rem 0.5rem">上传区变红 + toast 提示</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">文件过大 (&gt;10MB)</td><td style="padding:0.25rem 0.5rem">上传区变红 + 提示大小限制</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">解析失败</td><td style="padding:0.25rem 0.5rem">toast 提示具体原因</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">文本为空</td><td style="padding:0.25rem 0.5rem">拆分按钮保持禁用</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">服务不可达</td><td style="padding:0.25rem 0.5rem">状态灯变红 + 拆分按钮禁用 + toast</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">服务返回错误</td><td style="padding:0.25rem 0.5rem">主页面 toast 展示错误信息，不跳转</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">请求超时 (30s)</td><td style="padding:0.25rem 0.5rem">loading 状态结束 + toast 超时提示</td></tr>
+      <tr><td style="padding:0.25rem 0.5rem">拆分结果为 0 片段</td><td style="padding:0.25rem 0.5rem">依然跳转结果页，显示"未能拆分"</td></tr>
+    </table>
+  </div>
+  <div>
+    <h3>UI 状态机</h3>
+    <div style="font-size:0.85rem;line-height:1.8">
+      <p><b>IDLE</b> — 初始，等待输入<br>
+      &nbsp;&nbsp;→ 文本就绪 → <b>READY</b>（按钮激活）<br>
+      &nbsp;&nbsp;→ 服务断连 → <b>DISCONNECTED</b>（按钮禁用）</p>
+      <p><b>READY</b> — 有文本，可拆分<br>
+      &nbsp;&nbsp;→ 点击拆分 → <b>LOADING</b><br>
+      &nbsp;&nbsp;→ 文本被清空 → <b>IDLE</b></p>
+      <p><b>LOADING</b> — 按钮显示 spinner<br>
+      &nbsp;&nbsp;→ 成功 → 跳转结果页<br>
+      &nbsp;&nbsp;→ 失败/超时 → <b>READY</b> + toast</p>
+      <p><b>DISCONNECTED</b> — 服务不可达<br>
+      &nbsp;&nbsp;→ 定时重试 /health<br>
+      &nbsp;&nbsp;→ 恢复 → <b>IDLE</b></p>
+    </div>
+  </div>
+</div>

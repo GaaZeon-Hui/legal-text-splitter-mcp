@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem *)",
+      "Bash(git *)",
+      "Bash(bash *)",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(Get-Content \"C:\\\\Users\\\\matech\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-matech-Desktop-UI-SETTING\\\\91cdaeeb-a1eb-4b6d-b48a-c8d5c34cd061\\\\tasks\\\\bgi51a10v.output\")"
+    ]
+  }
+}

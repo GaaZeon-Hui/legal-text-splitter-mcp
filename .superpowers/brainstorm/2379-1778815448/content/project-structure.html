@@ -1,0 +1,60 @@
+<h2>Section 5 — Project File Structure</h2>
+<p class="subtitle">现有代码不动，新增 UI 包和服务入口</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">当前结构（不动）</div>
+    <div class="mockup-body" style="padding:1rem;font-size:0.78rem;font-family:monospace;line-height:1.7">
+      UI SETTING/<br>
+      ├── <span style="color:var(--gray-5)">UI.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← 将被替换<br>
+      ├──  _protection_config.py<br>
+      ├──  _type_patterns_config.py<br>
+      ├──  analyze_scored.py<br>
+      ├──  analyze_split_types.py<br>
+      ├──  pipeline_split.py<br>
+      └──  post-类型拆分.py
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">新增结构</div>
+    <div class="mockup-body" style="padding:1rem;font-size:0.78rem;font-family:monospace;line-height:1.7">
+      UI SETTING/<br>
+      ├──  <b>app/</b><br>
+      │&nbsp;&nbsp; ├──  <b>main.py</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← UI 入口<br>
+      │&nbsp;&nbsp; ├──  <b>pages/</b><br>
+      │&nbsp;&nbsp; │&nbsp;&nbsp; ├──  <b>index.py</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← 主页（上传+参数）<br>
+      │&nbsp;&nbsp; │&nbsp;&nbsp; └──  <b>results.py</b> &nbsp;&nbsp;&nbsp;&nbsp;← 结果页（表格）<br>
+      │&nbsp;&nbsp; └──  <b>components/</b><br>
+      │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├──  <b>file_upload.py</b> &nbsp;← 上传组件<br>
+      │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├──  <b>service_client.py</b> ← HTTP 客户端<br>
+      │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; └──  <b>result_table.py</b> &nbsp;← 结果表格组件<br>
+      ├──  <b>service/</b><br>
+      │&nbsp;&nbsp; ├──  <b>main.py</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← FastAPI 服务入口<br>
+      │&nbsp;&nbsp; └──  <b>split_service.py</b> &nbsp;&nbsp;&nbsp;← 分析+拆分封装<br>
+      └──  _protection_config.py &nbsp;&nbsp;&nbsp;← 不变<br>
+      &nbsp;&nbsp;&nbsp; ...
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">
+  <div>
+    <h3>app/main.py</h3>
+    <p style="font-size:0.85rem">NiceGUI 启动入口。注册页面路由，全局 header/状态。唯一的 <code>ui.run()</code> 调用。</p>
+    <p style="font-size:0.85rem">启动时自动检测服务连接状态（调 /health），断连则显示警告。</p>
+  </div>
+  <div>
+    <h3>service/main.py</h3>
+    <p style="font-size:0.85rem">FastAPI 服务入口。注册 /health 和 /api/split 端点。导入现有的 _protection_config、analyze_scored、post-类型拆分 模块。</p>
+    <p style="font-size:0.85rem">CORS 开启（允许 UI 跨域），单 worker 运行在 :8001。</p>
+  </div>
+  <div>
+    <h3>关键原则</h3>
+    <ul style="font-size:0.85rem">
+      <li>不修改任何现有 .py 文件（纯新增）</li>
+      <li>UI 端不 import 任何分析模块</li>
+      <li>服务端包一层薄薄的 FastAPI → 调现有函数</li>
+      <li>两端通过 JSON 合约通信</li>
+    </ul>
+  </div>
+</div>

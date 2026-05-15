@@ -1,0 +1,139 @@
+<h2>Section 3 — UI Page Layout (Revised)</h2>
+<p class="subtitle">主页面轻量输入 → 副页面沉浸浏览结果</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">主页面 / — 输入 & 发起拆分</div>
+    <div class="mockup-body" style="padding:0;font-size:0.82rem">
+
+      <div class="mock-nav" style="display:flex;justify-content:space-between;align-items:center">
+        <span><b>法律法规文本拆分</b></span>
+        <span style="display:flex;align-items:center;gap:0.5rem">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--green-6);display:inline-block"></span>
+          服务已连接
+        </span>
+      </div>
+
+      <!-- 输入区 -->
+      <div style="padding:2rem 1.5rem 1rem">
+        <div class="placeholder" style="min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--gray-4);border-radius:8px">
+          <p style="font-size:1rem;margin:0"><b>📂 拖拽文件到此处 或 点击上传</b></p>
+          <p style="color:var(--gray-5);font-size:0.8rem;margin:0.25rem 0">支持 .txt .docx .xlsx</p>
+          <p style="color:var(--gray-4);font-size:0.7rem;margin:0.25rem 0">也支持粘贴文本块到下方文本框</p>
+        </div>
+      </div>
+
+      <!-- 粘贴备选 -->
+      <div style="padding:0 1.5rem">
+        <div class="placeholder" style="min-height:60px;display:flex;align-items:center;justify-content:center;border:1px solid var(--gray-3);border-radius:6px;font-size:0.8rem;color:var(--gray-5)">
+          …或在此粘贴法条纯文本…
+        </div>
+      </div>
+
+      <!-- 参数区（折叠） -->
+      <div style="padding:0.75rem 1.5rem">
+        <details>
+          <summary style="cursor:pointer;font-weight:600;font-size:0.85rem">算法参数 ▾</summary>
+          <div style="display:flex;gap:1.5rem;margin-top:0.5rem;font-size:0.8rem">
+            <div>算法：<span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px">scored ▾</span></div>
+            <div>拆分类型：<span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px">自动检测 ▾</span></div>
+            <div>最小片段字数：<span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px">10</span></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- 拆分按钮 -->
+      <div style="padding:1rem 1.5rem 2rem;display:flex;gap:0.75rem;align-items:center">
+        <button class="mock-button" style="font-size:0.9rem;padding:0.6rem 2rem">拆 分</button>
+        <small style="color:var(--gray-5)">Ctrl+Enter</small>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">结果页面 /results — 摘要 + 分页表格</div>
+    <div class="mockup-body" style="padding:0;font-size:0.82rem">
+
+      <div class="mock-nav" style="display:flex;justify-content:space-between;align-items:center">
+        <span><b>拆分结果</b> ← 返回</span>
+        <span style="display:flex;gap:0.5rem">
+          <button class="mock-button" style="font-size:0.7rem;padding:0.2rem 0.5rem">导出 Excel</button>
+        </span>
+      </div>
+
+      <!-- 摘要栏 -->
+      <div style="padding:0.75rem 1rem;background:var(--gray-1);border-bottom:1px solid var(--gray-3);display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;font-size:0.75rem">
+        <span>📝 <b>字符数</b> 12,345</span>
+        <span>📦 <b>片段数</b> 1,234</span>
+        <span>🏷 <b>类型</b> 条、章、括号</span>
+        <span>🔗 <b>层级</b> 章→条</span>
+        <span>⏱ <b>耗时</b> 128ms</span>
+      </div>
+
+      <!-- 分页表格 + 搜索 -->
+      <div style="padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;font-size:0.75rem">
+        <span>搜索: <span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px;width:120px;display:inline-block;color:var(--gray-4)">关键词…</span></span>
+        <span>类型过滤: <span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px">全部 ▾</span></span>
+      </div>
+
+      <div style="padding:0 1rem 0.5rem">
+        <table style="width:100%;border-collapse:collapse;font-size:0.75rem">
+          <thead>
+            <tr style="background:var(--gray-2)">
+              <th style="padding:0.4rem;text-align:left;width:45px">#</th>
+              <th style="padding:0.4rem;text-align:left">内容</th>
+              <th style="padding:0.4rem;text-align:left;width:70px">类型</th>
+              <th style="padding:0.4rem;text-align:left;width:40px">层级</th>
+              <th style="padding:0.4rem;text-align:left;width:40px">序数</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-top:1px solid var(--gray-3)"><td style="padding:0.4rem">1</td><td style="padding:0.4rem;max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">第一条 为了规范市场秩序…</td><td style="padding:0.4rem"><span style="background:var(--blue-2);padding:0.05rem 0.3rem;border-radius:3px">条</span></td><td style="padding:0.4rem">0</td><td style="padding:0.4rem">1</td></tr>
+            <tr style="border-top:1px solid var(--gray-3);background:var(--gray-1)"><td style="padding:0.4rem">2</td><td style="padding:0.4rem;max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">第二条 市场准入实行负面清单制度。</td><td style="padding:0.4rem"><span style="background:var(--blue-2);padding:0.05rem 0.3rem;border-radius:3px">条</span></td><td style="padding:0.4rem">0</td><td style="padding:0.4rem">2</td></tr>
+            <tr style="border-top:1px solid var(--gray-3);color:var(--gray-4);text-align:center"><td colspan="5" style="padding:0.4rem">… 共 1,234 行 …</td></tr>
+            <tr style="border-top:1px solid var(--gray-3)"><td style="padding:0.4rem">1234</td><td style="padding:0.4rem;max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">第六百条 附则条款…</td><td style="padding:0.4rem"><span style="background:var(--blue-2);padding:0.05rem 0.3rem;border-radius:3px">条</span></td><td style="padding:0.4rem">0</td><td style="padding:0.4rem">600</td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;justify-content:center;align-items:center;gap:0.5rem;padding:0.5rem 0;font-size:0.75rem">
+          <span>◀</span> <span>第</span> <span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px">1</span> <span>/ 25 页</span> <span>▶</span>
+          <span style="margin-left:1rem">每页 <span style="border:1px solid var(--gray-4);padding:0.1rem 0.4rem;border-radius:4px">50 ▾</span> 条</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+  <div>
+    <h3>主页面职责</h3>
+    <ul style="font-size:0.85rem">
+      <li>文件上传 / 文本粘贴</li>
+      <li>参数配置（折叠）</li>
+      <li>触发拆分 → 跳转结果页</li>
+      <li>服务状态灯</li>
+      <li>极简，快速加载</li>
+    </ul>
+  </div>
+  <div>
+    <h3>结果页面职责</h3>
+    <ul style="font-size:0.85rem">
+      <li>摘要统计栏</li>
+      <li>分页表格（默认50条/页）</li>
+      <li>内容搜索 + 类型过滤</li>
+      <li>行展开查看完整内容</li>
+      <li>导出 Excel</li>
+      <li>返回主页面</li>
+    </ul>
+  </div>
+  <div>
+    <h3>大数据量策略</h3>
+    <ul style="font-size:0.85rem">
+      <li>服务端不做分页，一次返回全量 JSON</li>
+      <li>UI 端内存分页，避免二次请求</li>
+      <li>虚拟滚动备选（千条以上）</li>
+      <li>搜索/过滤在内存中完成</li>
+    </ul>
+  </div>
+</div>

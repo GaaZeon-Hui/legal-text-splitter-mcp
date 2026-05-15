@@ -1,0 +1,75 @@
+<h2>Section 2 — API Contract</h2>
+<p class="subtitle">FastAPI service endpoints</p>
+
+<h3>GET /health</h3>
+<div class="mockup">
+  <div class="mockup-body" style="padding:1rem">
+    <p style="margin:0"><b>Response 200:</b></p>
+    <pre style="background:var(--gray-2);padding:0.75rem;border-radius:6px;font-size:0.8rem">{
+  "status": "ok",
+  "version": "1.0.0",
+  "algorithms": ["scored", "legacy"]
+}</pre>
+  </div>
+</div>
+
+<h3 style="margin-top:1.5rem">POST /api/split</h3>
+<div class="mockup">
+  <div class="mockup-body" style="padding:1rem">
+    <p style="margin:0"><b>Request body:</b></p>
+    <pre style="background:var(--gray-2);padding:0.75rem;border-radius:6px;font-size:0.8rem">{
+  "text": "第一条 …\n第二条 …\n第一章 …",
+  "params": {                              // 可选，算法参数（未来扩展）
+    "algorithm": "scored",                 // "scored" | "legacy"
+    "split_types": null,                   // null=自动检测, 或 ["条","章","节"]
+    "min_fragment_chars": 10               // 最短片段阈值
+  }
+}</pre>
+
+    <p style="margin:1rem 0 0 0"><b>Response 200:</b></p>
+    <pre style="background:var(--gray-2);padding:0.75rem;border-radius:6px;font-size:0.8rem">{
+  "law_id": null,
+  "fragments": [
+    {
+      "seq": 1,
+      "content": "第一条 为了规范市场秩序…",
+      "split_type": "条",
+      "index_level": 3,
+      "ordinal": 1
+    },
+    {
+      "seq": 2,
+      "content": "第二条 市场准入…",
+      "split_type": "条",
+      "index_level": 3,
+      "ordinal": 2
+    }
+  ],
+  "meta": {
+    "char_count": 1234,
+    "fragment_count": 15,
+    "spine_types": ["条"],
+    "all_tags": ["条", "章", "括号"],
+    "level_chain": "章→条",
+    "processing_ms": 42,
+    "algorithm": "scored"
+  }
+}</pre>
+
+    <p style="margin:1rem 0 0 0"><b>Response 422 (空/无效文本):</b></p>
+    <pre style="background:var(--gray-2);padding:0.75rem;border-radius:6px;font-size:0.8rem">{
+  "detail": "文本为空或无法解析"
+}</pre>
+  </div>
+</div>
+
+<div class="section" style="margin-top:1.5rem">
+  <h3>fragment 字段说明</h3>
+  <table style="width:100%;font-size:0.85rem">
+    <tr><td><code>seq</code></td><td>片段序号（1-based）</td></tr>
+    <tr><td><code>content</code></td><td>片段完整文本</td></tr>
+    <tr><td><code>split_type</code></td><td>拆分类型：条/章/节/编/括号/数字点/… 或 null</td></tr>
+    <tr><td><code>index_level</code></td><td>层级深度（0=最外层，递增），由差分权重法推断</td></tr>
+    <tr><td><code>ordinal</code></td><td>该片段在原文档中的序数值（如第3条 → 3）</td></tr>
+  </table>
+</div>

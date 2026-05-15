@@ -1,0 +1,40 @@
+<h2>Architecture Approaches</h2>
+<p class="subtitle">Three ways to structure the UI + Service integration</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Single Process — Service Layer Pattern</h3>
+      <p>Everything runs in one Python process. NiceGUI calls a local <code>SplitService</code> class that wraps the existing analysis modules. The class has the same interface as the future remote service (async methods, JSON I/O), but executes locally. When the external service is ready, swap the implementation from <code>LocalSplitService</code> to <code>RemoteSplitService</code> — same interface.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Fastest to develop right now</li><li>No network overhead for local use</li><li>Interface abstraction ready for future migration</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>CPU-heavy analysis blocks the NiceGUI event loop (must use <code>asyncio.to_thread</code>)</li><li>Service not independently deployable yet</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Dual Process — FastAPI Service + NiceGUI Client</h3>
+      <p>Two separate Python processes: a FastAPI service on port 8001 that wraps the full pipeline, and NiceGUI on port 8080 that calls it via <code>httpx</code>. Both can be started from one launcher script. Full separation from day one.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>True process isolation</li><li>Service independently testable via curl / Swagger</li><li>No event loop blocking risk</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Two servers to manage in dev</li><li>HTTP serialization overhead</li><li>Need to handle service unavailability</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Single FastAPI — Mount NiceGUI</h3>
+      <p>One FastAPI app serves both. <code>/api/split</code> endpoints are plain FastAPI routes; <code>/*</code> routes are NiceGUI pages, mounted via <code>app.mount()</code>. The API and UI share one process but are separated by route namespace.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Single process, single port</li><li>API endpoints auto-documented (Swagger)</li><li>Clean migration path to separate service later</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Still shares the event loop (same blocking risk as A)</li><li>NiceGUI mounted under FastAPI has known quirks</li><li>Coupling at the process level</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
