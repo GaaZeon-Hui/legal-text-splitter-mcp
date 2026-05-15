@@ -64,7 +64,8 @@ def build():
             async def _check_click():
                 try:
                     raw = await ui.run_javascript(
-                        'var x=__pd;__pd=null;return x ? JSON.stringify(x) : null',
+                        'var x=typeof __pd!=="undefined"?__pd:null;__pd=null;'
+                        'return x?JSON.stringify(x):null',
                         timeout=0.3)
                 except Exception:
                     raw = None
@@ -139,7 +140,7 @@ def _inject_pretext_table(fragments):
         '    var r=ROWS[i];var d;var pm=pp[i];'
         '    var lr=mod.layout(pm.prep,cw,23);'
         '    if(lr.lineCount<=1&&lr.height<=23){d=r[1]}'
-        '    else{var fl=String(r[1]).split("\\\\n")[0];'
+        '    else{var NL=String.fromCharCode(10);var fl=String(r[1]).split(NL)[0];'
         '      d=fl.substring(0,tr(mod,fl,FONT,cw))+"\\u2026"}'  # … ellipsis
         '    h+="<tr data-seq=\\""+e(String(r[0]))+"\\">"'
         '      +"<td class=\\"pt-c1\\">"+e(r[0])+"</td>"'
@@ -162,7 +163,7 @@ def _inject_pretext_table(fragments):
         '    +"<th class=\\"pt-c3\\">类型</th><th class=\\"pt-c4\\">层级</th>"'
         '    +"<th class=\\"pt-c5\\">序数</th></tr></thead><tbody>";'
         '  for(var i=0;i<ROWS.length;i++){'
-        '    var r=ROWS[i];var fl=String(r[1]).split("\\\\n")[0]||"";'
+        '    var r=ROWS[i];var NL=String.fromCharCode(10);var fl=String(r[1]).split(NL)[0]||"";'
         '    h+="<tr data-seq=\\""+e(String(r[0]))+"\\">"'
         '      +"<td class=\\"pt-c1\\">"+e(r[0])+"</td>"'
         '      +"<td>"+e(fl)+"</td>"'
