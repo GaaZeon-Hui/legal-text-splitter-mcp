@@ -61,7 +61,9 @@
       "Bash(taskkill //PID 21952 //F)",
       "Bash(taskkill //PID 23404 //F)",
       "Bash(taskkill //PID 22596 //F)",
-      "Bash(taskkill //PID 7080 //F)"
+      "Bash(taskkill //PID 7080 //F)",
+      "Bash(taskkill //PID 24680 //F)",
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/\")"
     ]
   }
 }
