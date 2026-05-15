@@ -50,66 +50,66 @@ def build():
 
         # -- Table --
         if fragments:
-            columns = [
-                {'name': 'seq', 'label': '序号', 'field': 'seq',
-                 'style': 'width:50px;text-align:left'},
-                {'name': 'content', 'label': '内容', 'field': 'content',
-                 'style': 'text-align:left'},
-                {'name': 'split_type', 'label': '类型', 'field': 'split_type',
-                 'style': 'width:70px;text-align:left'},
-                {'name': 'index_level', 'label': '层级', 'field': 'index_level',
-                 'style': 'width:50px;text-align:left'},
-                {'name': 'ordinal', 'label': '序数', 'field': 'ordinal',
-                 'style': 'width:70px;text-align:left'},
-            ]
-
-            # Keep full content separate, show only first line in table
             full_content = {}
             rows = []
             for f in fragments:
-                ordinal = f.get('ordinal')
-                if isinstance(ordinal, list):
-                    ord_str = '.'.join(str(x) for x in ordinal)
-                elif ordinal is not None:
-                    ord_str = str(ordinal)
-                else:
-                    ord_str = '-'
                 seq = f.get('seq', '')
                 content = f.get('content', '')
-                # Table shows only first line
-                first_line = content.split('\n')[0] if content else ''
                 full_content[seq] = content
+                first_line = content.split('\n')[0].strip() if content else ''
                 rows.append({
                     'seq': seq,
                     'content': first_line,
                     'split_type': f.get('split_type') or '-',
                     'index_level': f.get('index_level', '-'),
-                    'ordinal': ord_str,
+                    'ordinal': _fmt_ordinal(f.get('ordinal')),
+                    # Pass full content to dialog via closure
                 })
 
             table = ui.table(
-                columns=columns, rows=rows, row_key='seq',
+                columns=[
+                    {'name': 'seq', 'label': '序号', 'field': 'seq',
+                     'style': 'width:50px;text-align:left'},
+                    {'name': 'content', 'label': '内容', 'field': 'content',
+                     'style': 'text-align:left'},
+                    {'name': 'split_type', 'label': '类型', 'field': 'split_type',
+                     'style': 'width:70px;text-align:left'},
+                    {'name': 'index_level', 'label': '层级', 'field': 'index_level',
+                     'style': 'width:50px;text-align:left'},
+                    {'name': 'ordinal', 'label': '序数', 'field': 'ordinal',
+                     'style': 'width:70px;text-align:left'},
+                ],
+                rows=rows, row_key='seq',
             ).classes('w-full result-table')
 
-            # Double-click opens dialog with full content
-            def on_dblclick(e):
-                row = e.args.get('row')
-                if not row:
-                    return
+            # Double-click row → dialog
+            async def _row_handler(e):
+                row = e.args.get('row', {})
                 seq = row.get('seq')
+                if seq is None:
+                    return
                 text = full_content.get(seq, '')
+                st = row.get('split_type', '-')
                 with ui.dialog() as dialog, ui.card().classes('p-4 max-w-3xl'):
                     ui.label(f'片段 #{seq}').classes('text-lg font-bold')
-                    ui.label(f'类型: {row.get("split_type", "-")}').classes('text-sm text-grey')
+                    ui.label(f'类型: {st}').classes('text-sm text-grey')
                     ui.separator()
                     ui.markdown(text).classes('whitespace-pre-wrap max-h-96 overflow-auto')
                     with ui.row().classes('justify-end'):
                         ui.button('关闭', on_click=dialog.close)
                 dialog.open()
 
-            table.on('rowDblclick', on_dblclick)
+            table.on('rowClick', _row_handler)
         else:
             ui.label('未能拆分出片段').classes('text-grey')
+
+
+def _fmt_ordinal(ordinal):
+    if isinstance(ordinal, list):
+        return '.'.join(str(x) for x in ordinal)
+    if ordinal is not None:
+        return str(ordinal)
+    return '-'
 
 
 def _do_export():
@@ -133,19 +133,11 @@ def _do_export():
         ws.cell(row=1, column=col, value=h)
 
     for i, frag in enumerate(fragments, start=2):
-        ordinal = frag.get('ordinal')
-        if isinstance(ordinal, list):
-            ord_str = '.'.join(str(x) for x in ordinal)
-        elif ordinal is not None:
-            ord_str = str(ordinal)
-        else:
-            ord_str = '-'
-
         ws.cell(row=i, column=1, value=frag.get('seq', ''))
         ws.cell(row=i, column=2, value=frag.get('content', ''))
         ws.cell(row=i, column=3, value=frag.get('split_type', '-'))
         ws.cell(row=i, column=4, value=frag.get('index_level', '-'))
-        ws.cell(row=i, column=5, value=ord_str)
+        ws.cell(row=i, column=5, value=_fmt_ordinal(frag.get('ordinal')))
 
     output = io.BytesIO()
     wb.save(output)
