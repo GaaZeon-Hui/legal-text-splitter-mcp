@@ -32,7 +32,8 @@
       "Bash(taskkill //PID 28244 //F)",
       "Bash(awk '{print $5}')",
       "Bash(taskkill //PID 3824 //F)",
-      "Bash(curl -s -o /dev/null -w \"/test: %{http_code}\" http://127.0.0.1:8080/test)"
+      "Bash(curl -s -o /dev/null -w \"/test: %{http_code}\" http://127.0.0.1:8080/test)",
+      "Bash(taskkill //PID 19904 //F)"
     ]
   }
 }

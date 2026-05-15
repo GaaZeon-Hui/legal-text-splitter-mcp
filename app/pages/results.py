@@ -34,15 +34,37 @@ def build():
             ui.label(f'耗时: {meta.get("processing_ms", 0)}ms').classes('text-sm')
             ui.label(f'算法: {meta.get("algorithm", "-")}').classes('text-sm')
 
+        # -- Truncation CSS --
+        ui.add_css('''
+        .result-table .q-table tbody td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 0;
+            text-align: left;
+        }
+        .result-table .q-table tbody tr {
+            height: 32px;
+        }
+        ''')
+
         # -- Table --
         if fragments:
             columns = [
-                {'name': 'seq', 'label': '序号', 'field': 'seq', 'sortable': True},
-                {'name': 'content', 'label': '内容', 'field': 'content', 'sortable': False},
-                {'name': 'split_type', 'label': '类型', 'field': 'split_type', 'sortable': True},
-                {'name': 'index_level', 'label': '层级', 'field': 'index_level', 'sortable': True},
-                {'name': 'ordinal', 'label': '序数', 'field': 'ordinal', 'sortable': True},
+                {'name': 'seq', 'label': '序号', 'field': 'seq',
+                 'style': 'width:50px;text-align:left'},
+                {'name': 'content', 'label': '内容', 'field': 'content',
+                 'style': 'text-align:left'},
+                {'name': 'split_type', 'label': '类型', 'field': 'split_type',
+                 'style': 'width:70px;text-align:left'},
+                {'name': 'index_level', 'label': '层级', 'field': 'index_level',
+                 'style': 'width:50px;text-align:left'},
+                {'name': 'ordinal', 'label': '序数', 'field': 'ordinal',
+                 'style': 'width:70px;text-align:left'},
             ]
+
+            # Keep full content separate, show only first line in table
+            full_content = {}
             rows = []
             for f in fragments:
                 ordinal = f.get('ordinal')
@@ -52,14 +74,40 @@ def build():
                     ord_str = str(ordinal)
                 else:
                     ord_str = '-'
+                seq = f.get('seq', '')
+                content = f.get('content', '')
+                # Table shows only first line
+                first_line = content.split('\n')[0] if content else ''
+                full_content[seq] = content
                 rows.append({
-                    'seq': f.get('seq', ''),
-                    'content': f.get('content', ''),
+                    'seq': seq,
+                    'content': first_line,
                     'split_type': f.get('split_type') or '-',
                     'index_level': f.get('index_level', '-'),
                     'ordinal': ord_str,
                 })
-            ui.table(columns=columns, rows=rows, row_key='seq').classes('w-full')
+
+            table = ui.table(
+                columns=columns, rows=rows, row_key='seq',
+            ).classes('w-full result-table')
+
+            # Double-click opens dialog with full content
+            def on_dblclick(e):
+                row = e.args.get('row')
+                if not row:
+                    return
+                seq = row.get('seq')
+                text = full_content.get(seq, '')
+                with ui.dialog() as dialog, ui.card().classes('p-4 max-w-3xl'):
+                    ui.label(f'片段 #{seq}').classes('text-lg font-bold')
+                    ui.label(f'类型: {row.get("split_type", "-")}').classes('text-sm text-grey')
+                    ui.separator()
+                    ui.markdown(text).classes('whitespace-pre-wrap max-h-96 overflow-auto')
+                    with ui.row().classes('justify-end'):
+                        ui.button('关闭', on_click=dialog.close)
+                dialog.open()
+
+            table.on('rowDblclick', on_dblclick)
         else:
             ui.label('未能拆分出片段').classes('text-grey')
 
