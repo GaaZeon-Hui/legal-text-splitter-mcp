@@ -4,8 +4,9 @@ Endpoints:
     GET  /health     — health check
     POST /api/split  — analyze + split legal text
 """
-import sys
+import asyncio
 import os
+import sys
 
 _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT not in sys.path:
@@ -22,8 +23,8 @@ app = FastAPI(title='法规文本拆分服务', version='1.0.0')
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
-    allow_credentials=True,
+    allow_origins=['http://localhost:8080'],
+    allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*'],
 )
@@ -47,12 +48,13 @@ async def health():
 
 
 @app.post('/api/split')
-async def api_split(req: SplitRequest):
-    if not req.text or not req.text.strip():
+async def api_split(request: SplitRequest):
+    if not request.text or not request.text.strip():
         raise HTTPException(status_code=422, detail='文本为空或无法解析')
 
     try:
-        result = _split_text(req.text, req.params.model_dump())
+        result = await asyncio.to_thread(
+            _split_text, request.text, request.params.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
