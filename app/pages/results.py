@@ -1,4 +1,5 @@
-"""Results page: summary bar, table, search, export."""
+"""Results page: summary bar, table, export."""
+import json
 from nicegui import app, ui
 
 
@@ -34,74 +35,95 @@ def build():
             ui.label(f'耗时: {meta.get("processing_ms", 0)}ms').classes('text-sm')
             ui.label(f'算法: {meta.get("algorithm", "-")}').classes('text-sm')
 
-        # -- Truncation CSS --
-        ui.add_css('''
-        .result-table .q-table tbody td {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 0;
-            text-align: left;
-        }
-        .result-table .q-table tbody tr {
-            height: 32px;
-        }
-        ''')
-
         # -- Table --
         if fragments:
-            full_content = {}
-            rows = []
-            for f in fragments:
-                seq = f.get('seq', '')
-                content = f.get('content', '')
-                full_content[seq] = content
-                first_line = content.split('\n')[0].strip() if content else ''
-                rows.append({
-                    'seq': seq,
-                    'content': first_line,
-                    'split_type': f.get('split_type') or '-',
-                    'index_level': f.get('index_level', '-'),
-                    'ordinal': _fmt_ordinal(f.get('ordinal')),
-                    # Pass full content to dialog via closure
-                })
-
-            table = ui.table(
-                columns=[
-                    {'name': 'seq', 'label': '序号', 'field': 'seq',
-                     'style': 'width:50px;text-align:left'},
-                    {'name': 'content', 'label': '内容', 'field': 'content',
-                     'style': 'text-align:left'},
-                    {'name': 'split_type', 'label': '类型', 'field': 'split_type',
-                     'style': 'width:70px;text-align:left'},
-                    {'name': 'index_level', 'label': '层级', 'field': 'index_level',
-                     'style': 'width:50px;text-align:left'},
-                    {'name': 'ordinal', 'label': '序数', 'field': 'ordinal',
-                     'style': 'width:70px;text-align:left'},
-                ],
-                rows=rows, row_key='seq',
-            ).classes('w-full result-table')
-
-            # Double-click row → dialog
-            async def _row_handler(e):
-                row = e.args.get('row', {})
-                seq = row.get('seq')
-                if seq is None:
-                    return
-                text = full_content.get(seq, '')
-                st = row.get('split_type', '-')
-                with ui.dialog() as dialog, ui.card().classes('p-4 max-w-3xl'):
-                    ui.label(f'片段 #{seq}').classes('text-lg font-bold')
-                    ui.label(f'类型: {st}').classes('text-sm text-grey')
-                    ui.separator()
-                    ui.markdown(text).classes('whitespace-pre-wrap max-h-96 overflow-auto')
-                    with ui.row().classes('justify-end'):
-                        ui.button('关闭', on_click=dialog.close)
-                dialog.open()
-
-            table.on('rowClick', _row_handler)
+            _build_result_table(fragments)
         else:
             ui.label('未能拆分出片段').classes('text-grey')
+
+
+def _build_result_table(fragments):
+    """Render a pure HTML table with full control over layout, and a JS→Py bridge
+    to show a detail dialog on row click."""
+    # Pack full content into a JS dict, keyed by seq
+    detail_js = {}
+    rows_html = ''
+    for f in fragments:
+        seq = f.get('seq', '')
+        content = f.get('content', '')
+        first_line = content.split('\n')[0].strip() if content else ''
+        st = f.get('split_type') or '-'
+        il = f.get('index_level')
+        il_str = str(il) if il is not None else '-'
+        ord_val = _fmt_ordinal(f.get('ordinal'))
+
+        # Store full text for the dialog
+        safe_content = json.dumps(content, ensure_ascii=False)
+        safe_type = json.dumps(st, ensure_ascii=False)
+        detail_js[str(seq)] = {'seq': seq, 'type': st, 'text': content}
+
+        rows_html += (
+            '<tr class="dr" onclick="__pd='
+            + json.dumps({'s': seq, 't': st, 'c': content}, ensure_ascii=False)
+            + '">'
+            + f'<td class="cs">{seq}</td>'
+            + f'<td class="cc"><span>{_esc(first_line)}</span></td>'
+            + f'<td class="ct">{_esc(st)}</td>'
+            + f'<td class="cl">{il_str}</td>'
+            + f'<td class="co">{ord_val}</td>'
+            + '</tr>'
+        )
+
+    html = (
+        '<style>'
+        '.st{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:1.4}'
+        '.st thead{background:#f5f5f5;border-bottom:2px solid #ddd}'
+        '.st th{padding:8px 6px;text-align:left;font-weight:600;color:#555;white-space:nowrap}'
+        '.st td{padding:6px 6px;text-align:left;border-bottom:1px solid #eee}'
+        '.st .dr{cursor:pointer;height:32px}'
+        '.st .dr:hover{background:#f0f7ff}'
+        '.cs{width:50px}.ct{width:70px}.cl{width:50px}.co{width:80px}'
+        '.cc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+        '</style>'
+        '<table class="st"><thead><tr>'
+        '<th class="cs">序号</th><th class="cc">内容</th>'
+        '<th class="ct">类型</th><th class="cl">层级</th><th class="co">序数</th>'
+        '</tr></thead><tbody>'
+        + rows_html
+        + '</tbody></table>'
+    )
+
+    ui.html(html).classes('w-full')
+
+    # Poll for row clicks via a timer that reads __pd from JS and shows dialog
+    async def _check_click():
+        try:
+            raw = await ui.run_javascript('var x=__pd;__pd=null;return x ? JSON.stringify(x) : null', timeout=0.3)
+        except Exception:
+            raw = None
+        if raw:
+            data = json.loads(raw)
+            seq = data.get('s', '?')
+            text = data.get('c', '')
+            st = data.get('t', '-')
+            with ui.dialog() as dialog, ui.card().classes('p-4 max-w-3xl'):
+                ui.label(f'片段 #{seq}').classes('text-lg font-bold')
+                ui.label(f'类型: {st}').classes('text-sm text-grey')
+                ui.separator()
+                ui.markdown(text).classes('whitespace-pre-wrap max-h-96 overflow-auto')
+                with ui.row().classes('justify-end'):
+                    ui.button('关闭', on_click=dialog.close)
+            dialog.open()
+
+    ui.timer(0.3, _check_click)
+
+
+def _esc(text):
+    return (str(text)
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;'))
 
 
 def _fmt_ordinal(ordinal):
@@ -127,11 +149,8 @@ def _do_export():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = '拆分结果'
-
-    headers = ['序号', '内容', '类型', '层级', '序数']
-    for col, h in enumerate(headers, start=1):
+    for col, h in enumerate(['序号', '内容', '类型', '层级', '序数'], start=1):
         ws.cell(row=1, column=col, value=h)
-
     for i, frag in enumerate(fragments, start=2):
         ws.cell(row=i, column=1, value=frag.get('seq', ''))
         ws.cell(row=i, column=2, value=frag.get('content', ''))
@@ -142,5 +161,4 @@ def _do_export():
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-
     ui.download(output.read(), '拆分结果.xlsx')
