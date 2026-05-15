@@ -4,6 +4,7 @@ Registers pages, starts the health poll timer,
 and launches the UI server.
 """
 import asyncio
+import os
 from nicegui import app, ui
 
 from app.components.service_client import client as svc
