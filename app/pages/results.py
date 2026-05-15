@@ -78,10 +78,15 @@ def _build_pretext_table(fragments):
         '.pt-s{width:36px;padding-left:4px!important}'
         '.pt-t{width:64px}.pt-l{width:40px}.pt-o{width:76px}'
         '</style>'
+    )
+    ui.html(html).classes('w-full')
+
+    # Script must go via add_body_html — ui.html() rejects <script> tags
+    script = (
         '<script type="module">'
-        f'const ROWS = {rows_json};'
-        f'const DETAIL = {detail_json};'
-        f'const FONT = "15px {font_stack}";'
+        f'var ROWS = {rows_json};'
+        f'var DETAIL = {detail_json};'
+        f'var FONT = "15px {font_stack}";'
         'function esc(s){var t=document.createElement("span");t.textContent=String(s);return t.innerHTML}'
         'function _truncIdx(mod,text,font,mw){'
         '  var lo=0,hi=text.length;var p=mod.prepare,l=mod.layout;'
@@ -130,8 +135,7 @@ def _build_pretext_table(fragments):
         'init();'
         '</script>'
     )
-
-    ui.html(html).classes('w-full')
+    ui.add_body_html(script)
 
     async def _check_click():
         try:
