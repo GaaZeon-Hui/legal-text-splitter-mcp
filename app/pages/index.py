@@ -59,13 +59,11 @@ def build():
         # -- Loading indicator --
         _spinner = ui.spinner(size='lg').classes('hidden')
 
-    # -- Health check: sync timer triggers async work --
+    # -- Health check (debug: hardcode first, then real) --
     async def _check_health():
         nonlocal service_online
-        try:
-            service_online = await svc.health()
-        except Exception:
-            service_online = False
+        _status_label.set_text('timer fired')
+        service_online = await svc.health()
         if service_online:
             _status_dot.classes(remove='bg-red')
             _status_dot.classes(add='bg-green')
