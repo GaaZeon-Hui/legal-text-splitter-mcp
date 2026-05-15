@@ -1,7 +1,5 @@
-"""Results page: summary bar, AG Grid table, search, export."""
+"""Results page: summary bar, table, search, export."""
 from nicegui import app, ui
-
-from app.components.aggrid_table import build_aggrid
 
 
 def build():
@@ -36,19 +34,34 @@ def build():
             ui.label(f'耗时: {meta.get("processing_ms", 0)}ms').classes('text-sm')
             ui.label(f'算法: {meta.get("algorithm", "-")}').classes('text-sm')
 
-        # -- Search bar --
-        search_input = ui.input(
-            '搜索片段内容',
-            placeholder='输入关键词…',
-        ).classes('w-64')
-
-        # -- AG Grid --
-        grid = build_aggrid(fragments, meta)
-
-        # Wire search to AG Grid quickFilter
-        search_input.on('keydown',
-            lambda e: grid.call_api_method('setGridOption', 'quickFilterText', e.args.get('value', '')),
-            throttle=0.3)
+        # -- Table --
+        if fragments:
+            columns = [
+                {'name': 'seq', 'label': '序号', 'field': 'seq', 'sortable': True},
+                {'name': 'content', 'label': '内容', 'field': 'content', 'sortable': False},
+                {'name': 'split_type', 'label': '类型', 'field': 'split_type', 'sortable': True},
+                {'name': 'index_level', 'label': '层级', 'field': 'index_level', 'sortable': True},
+                {'name': 'ordinal', 'label': '序数', 'field': 'ordinal', 'sortable': True},
+            ]
+            rows = []
+            for f in fragments:
+                ordinal = f.get('ordinal')
+                if isinstance(ordinal, list):
+                    ord_str = '.'.join(str(x) for x in ordinal)
+                elif ordinal is not None:
+                    ord_str = str(ordinal)
+                else:
+                    ord_str = '-'
+                rows.append({
+                    'seq': f.get('seq', ''),
+                    'content': f.get('content', ''),
+                    'split_type': f.get('split_type') or '-',
+                    'index_level': f.get('index_level', '-'),
+                    'ordinal': ord_str,
+                })
+            ui.table(columns=columns, rows=rows, row_key='seq').classes('w-full')
+        else:
+            ui.label('未能拆分出片段').classes('text-grey')
 
 
 def _do_export():
