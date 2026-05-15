@@ -33,12 +33,20 @@ split_single_group_with_rollback = _post_mod.split_single_group_with_rollback
 from analyze_split_types import _format_level_chain
 
 
+_ORDINAL_PATTERN_CACHE = {}
+
 def _extract_ordinal(content, split_type):
-    """Extract the ordinal value from a fragment's content based on its split_type."""
+    """Extract the ordinal value from a fragment's content based on its split_type.
+
+    Patterns are cached per split_type to avoid rebuilding compiled regex for
+    every fragment in large documents (the caller loops over all fragments).
+    """
     if not split_type:
         return None
     try:
-        patterns = build_type_patterns([split_type])
+        if split_type not in _ORDINAL_PATTERN_CACHE:
+            _ORDINAL_PATTERN_CACHE[split_type] = build_type_patterns([split_type])
+        patterns = _ORDINAL_PATTERN_CACHE[split_type]
         for name, pat, func in patterns:
             m = pat.match(content)
             if m:
@@ -46,7 +54,7 @@ def _extract_ordinal(content, split_type):
                 if val is not None:
                     return val
         return None
-    except Exception:
+    except (AttributeError, TypeError):
         return None
 
 
