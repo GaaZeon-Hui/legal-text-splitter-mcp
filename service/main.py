@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
-from service.split_service import split_text as _split_text, MAX_FRAGMENTS
+from service.split_service import split_text as _split_text
 
 app = FastAPI(title='法规文本拆分服务', version='1.0.0')
 

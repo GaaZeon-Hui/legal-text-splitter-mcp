@@ -7,7 +7,8 @@
       "Bash(Start-Sleep -Seconds 3)",
       "Bash(Get-Content \"C:\\\\Users\\\\matech\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-matech-Desktop-UI-SETTING\\\\91cdaeeb-a1eb-4b6d-b48a-c8d5c34cd061\\\\tasks\\\\bgi51a10v.output\")",
       "PowerShell(New-Item *)",
-      "Bash(python -c \"from service.split_service import split_text, MAX_FRAGMENTS; print\\('MAX_FRAGMENTS:', MAX_FRAGMENTS\\); text='第一条 第一条。\\\\n第二条 第二条。'; r = split_text\\(text\\); print\\('fragments:', len\\(r['fragments']\\)\\); print\\('meta keys:', list\\(r['meta'].keys\\(\\)\\)\\); print\\('fragment keys:', list\\(r['fragments'][0].keys\\(\\)\\) if r['fragments'] else 'NONE'\\)\")"
+      "Bash(python -c \"from service.split_service import split_text, MAX_FRAGMENTS; print\\('MAX_FRAGMENTS:', MAX_FRAGMENTS\\); text='第一条 第一条。\\\\n第二条 第二条。'; r = split_text\\(text\\); print\\('fragments:', len\\(r['fragments']\\)\\); print\\('meta keys:', list\\(r['meta'].keys\\(\\)\\)\\); print\\('fragment keys:', list\\(r['fragments'][0].keys\\(\\)\\) if r['fragments'] else 'NONE'\\)\")",
+      "PowerShell(pip install *)"
     ]
   }
 }
