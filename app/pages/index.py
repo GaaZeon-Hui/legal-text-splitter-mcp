@@ -1,5 +1,6 @@
 """Main page: file upload, text editing, parameters, and split trigger."""
-from nicegui import app, ui
+import asyncio
+from nicegui import app, background_tasks, ui
 
 from app.components.file_upload import FileUpload
 from app.components.service_client import client as svc, ServiceError
@@ -58,20 +59,23 @@ def build():
         # -- Loading indicator --
         _spinner = ui.spinner(size='lg').classes('hidden')
 
-    # -- Health check (runs once after page loads) --
-    async def _init_health():
+    # -- Health poll loop (runs as long as the page is open) --
+    async def _health_loop():
         nonlocal service_online
-        service_online = await svc.health()
-        if service_online:
-            _status_dot.classes(add='bg-green')
-            _status_label.set_text('服务已连接')
-        else:
-            _status_dot.classes(add='bg-red')
-            _status_label.set_text('服务断开')
-        _split_btn.enabled = bool(current_text.strip()) and service_online
+        while True:
+            service_online = await svc.health()
+            if service_online:
+                _status_dot.classes(remove='bg-red')
+                _status_dot.classes(add='bg-green')
+                _status_label.set_text('服务已连接')
+            else:
+                _status_dot.classes(remove='bg-green')
+                _status_dot.classes(add='bg-red')
+                _status_label.set_text('服务断开')
+            _split_btn.enabled = bool(current_text.strip()) and service_online
+            await asyncio.sleep(5)
 
-    # Use ui.timer with once=True — fires once after a short delay
-    ui.timer(0.5, _init_health, once=True)
+    background_tasks.create(_health_loop(), name='health-poll')
 
     # -- Actions --
     def _on_key(e):
