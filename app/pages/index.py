@@ -59,23 +59,24 @@ def build():
         # -- Loading indicator --
         _spinner = ui.spinner(size='lg').classes('hidden')
 
-    # -- Health poll loop (runs as long as the page is open) --
-    async def _health_loop():
+    # -- Health check: sync timer triggers async work --
+    async def _check_health():
         nonlocal service_online
-        while True:
+        try:
             service_online = await svc.health()
-            if service_online:
-                _status_dot.classes(remove='bg-red')
-                _status_dot.classes(add='bg-green')
-                _status_label.set_text('服务已连接')
-            else:
-                _status_dot.classes(remove='bg-green')
-                _status_dot.classes(add='bg-red')
-                _status_label.set_text('服务断开')
-            _split_btn.enabled = bool(current_text.strip()) and service_online
-            await asyncio.sleep(5)
+        except Exception:
+            service_online = False
+        if service_online:
+            _status_dot.classes(remove='bg-red')
+            _status_dot.classes(add='bg-green')
+            _status_label.set_text('服务已连接')
+        else:
+            _status_dot.classes(remove='bg-green')
+            _status_dot.classes(add='bg-red')
+            _status_label.set_text('服务断开')
+        _split_btn.enabled = bool(current_text.strip()) and service_online
 
-    background_tasks.create(_health_loop(), name='health-poll')
+    ui.timer(2.0, _check_health)
 
     # -- Actions --
     def _on_key(e):
