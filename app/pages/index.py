@@ -1,6 +1,5 @@
 """Main page: file upload, text editing, parameters, and split trigger."""
-import asyncio
-from nicegui import app, background_tasks, ui
+from nicegui import app, ui
 
 from app.components.file_upload import FileUpload
 from app.components.service_client import client as svc, ServiceError
@@ -59,10 +58,9 @@ def build():
         # -- Loading indicator --
         _spinner = ui.spinner(size='lg').classes('hidden')
 
-    # -- Health check (debug: hardcode first, then real) --
+    # -- Health poll --
     async def _check_health():
         nonlocal service_online
-        _status_label.set_text('timer fired')
         service_online = await svc.health()
         if service_online:
             _status_dot.classes(remove='bg-red')
@@ -74,7 +72,7 @@ def build():
             _status_label.set_text('服务断开')
         _split_btn.enabled = bool(current_text.strip()) and service_online
 
-    ui.timer(2.0, _check_health)
+    ui.timer(5.0, _check_health)
 
     # -- Actions --
     def _on_key(e):
