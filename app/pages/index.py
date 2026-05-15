@@ -58,22 +58,20 @@ def build():
         # -- Loading indicator --
         _spinner = ui.spinner(size='lg').classes('hidden')
 
-    # -- Health poll timer (async, has page context) --
-    async def _check_health():
+    # -- Health check (runs once after page loads) --
+    async def _init_health():
         nonlocal service_online
         service_online = await svc.health()
         if service_online:
-            _status_dot.classes(remove='bg-red')
             _status_dot.classes(add='bg-green')
             _status_label.set_text('服务已连接')
         else:
-            _status_dot.classes(remove='bg-green')
             _status_dot.classes(add='bg-red')
             _status_label.set_text('服务断开')
-        # Update split button in case service state changed
         _split_btn.enabled = bool(current_text.strip()) and service_online
 
-    ui.timer(5.0, _check_health)
+    # Use ui.timer with once=True — fires once after a short delay
+    ui.timer(0.5, _init_health, once=True)
 
     # -- Actions --
     def _on_key(e):
