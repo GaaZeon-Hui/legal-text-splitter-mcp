@@ -63,7 +63,10 @@
       "Bash(taskkill //PID 22596 //F)",
       "Bash(taskkill //PID 7080 //F)",
       "Bash(taskkill //PID 24680 //F)",
-      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/\")"
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/\")",
+      "Bash(taskkill //PID 29356 //F)",
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/generated/\")",
+      "Bash(curl -sL --max-time 15 -o \"C:/Users/matech/Desktop/UI SETTING/static/generated/bidi-data.js\" \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/generated/bidi-data.js\")"
     ]
   }
 }

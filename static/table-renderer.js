@@ -51,7 +51,7 @@ async function render(mod) {
     const root = document.getElementById('pt-root');
     if (!root) return;
 
-    const cw = root.clientWidth - 36 - 64 - 40 - 76 - 28;
+    const cw = root.clientWidth - 44 - 72 - 56 - 88 - 24;
     if (!mod || cw < 80) {
         fallback(root);
         return;
