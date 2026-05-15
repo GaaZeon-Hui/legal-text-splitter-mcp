@@ -3,7 +3,8 @@
 Registers pages and launches the UI server.
 """
 import os
-from nicegui import ui
+from nicegui import app, ui
+from fastapi.staticfiles import StaticFiles
 
 
 @ui.page('/')
@@ -19,6 +20,8 @@ def results_page():
     from app.pages.results import build as _build_results
     _build_results()
 
+
+app.mount('/static', StaticFiles(directory='static'))
 
 ui.run(
     host='127.0.0.1',
