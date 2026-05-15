@@ -38,7 +38,14 @@
       "Bash(taskkill //PID 15848 //F)",
       "WebFetch(domain:github.com)",
       "Bash(curl -sL \"https://api.github.com/repos/chenglou/pretext\")",
-      "WebSearch"
+      "WebSearch",
+      "Bash(taskkill //PID 20488 //F)",
+      "Bash(curl -sL --max-time 10 \"https://raw.githubusercontent.com/chenglou/pretext/master/pretext.css\")",
+      "Bash(curl -sL --max-time 15 \"https://raw.githubusercontent.com/chenglou/pretext/main/pretext.css\")",
+      "Bash(curl -sL --max-time 15 \"https://api.github.com/repos/chenglou/pretext/git/trees/HEAD?recursive=1\")",
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/pretext.css\")",
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/\")",
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/README.md\")"
     ]
   }
 }
