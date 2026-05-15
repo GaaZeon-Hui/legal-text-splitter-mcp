@@ -16,7 +16,7 @@ from _protection_config import apply_protection_blocks, _restore_placeholders
 from _type_patterns_config import build_type_patterns
 from analyze_scored import analyze as analyze_scored
 from analyze_split_types import analyze as analyze_legacy
-from analyze_split_types import print_report, infer_type_levels, count_paragraphs
+from analyze_split_types import print_report, infer_type_levels
 
 # post-类型拆分 uses Chinese filename — import via importlib
 from importlib import util as _importlib_util
