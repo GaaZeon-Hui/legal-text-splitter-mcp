@@ -56,7 +56,8 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Version:', d['version']\\); print\\('Exports:', json.dumps\\(d.get\\('exports',{}\\), indent=2\\)\\)\")",
       "Bash(curl -sL --max-time 15 -o \"C:/Users/matech/Desktop/UI SETTING/static/pretext-layout.js\" \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/layout.js\")",
       "Bash(curl -sL --max-time 15 -o \"C:/Users/matech/Desktop/UI SETTING/static/pretext-rich-inline.js\" \"https://cdn.jsdelivr.net/npm/@chenglou/pretext@0.0.7/dist/rich-inline.js\")",
-      "Bash(taskkill //PID 15000 //F)"
+      "Bash(taskkill //PID 15000 //F)",
+      "Bash(taskkill //PID 3396 //F)"
     ]
   }
 }
