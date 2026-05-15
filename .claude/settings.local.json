@@ -48,7 +48,8 @@
       "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/README.md\")",
       "Bash(taskkill //PID 1332 //F)",
       "WebFetch(domain:chenglou.me)",
-      "Bash(curl -sL --max-time 10 \"https://chenglou.me/pretext/\")"
+      "Bash(curl -sL --max-time 10 \"https://chenglou.me/pretext/\")",
+      "Bash(taskkill //PID 18676 //F)"
     ]
   }
 }
