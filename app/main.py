@@ -71,5 +71,5 @@ ui.run(
     favicon='📋',
     storage_secret='split-ui-secret-v1',
     reload=False,
-    show=True,
+    show=os.environ.get('UI_NO_BROWSER', '').lower() != 'true',
 )
