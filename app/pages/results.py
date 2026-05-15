@@ -113,8 +113,8 @@ def _inject_pretext_table(fragments):
         's.textContent = `'
         f'var ROWS = {rows_json};'
         f'var DETAIL = {detail_json};'
-        'var FONT = "15px \\"Inter\\", -apple-system, BlinkMacSystemFont, \\"Segoe UI\\",'
-        ' \\"PingFang SC\\", \\"Microsoft YaHei\\", \\"Noto Sans SC\\", sans-serif";'
+        'var FONT = "15px Inter, -apple-system, BlinkMacSystemFont, Segoe UI,'
+        ' PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif";'
         # esc: safe HTML escaping via textContent
         'function e(t){var s=document.createElement("span");s.textContent=String(t);return s.innerHTML}'
         # Binary search truncation using pretext's pixel-accurate measurement
