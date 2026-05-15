@@ -5,22 +5,23 @@ and launches the UI server.
 """
 import asyncio
 import os
-from nicegui import app, ui
+from nicegui import app, background_tasks, ui
 
 from app.components.service_client import client as svc
 
 SERVICE_URL = 'http://127.0.0.1:8001'
 HEALTH_POLL_SECONDS = 5.0
 
-
 # Global service status — read by index.py for the status indicator
 service_online = False
 
 
-async def _poll_health():
-    """Periodically check service health."""
+async def _health_poll_loop():
+    """Background task that polls /health periodically."""
     global service_online
-    service_online = await svc.health()
+    while True:
+        service_online = await svc.health()
+        await asyncio.sleep(HEALTH_POLL_SECONDS)
 
 
 @ui.page('/')
@@ -39,30 +40,8 @@ def results_page():
 
 @app.on_startup
 async def startup():
-    ui.timer(HEALTH_POLL_SECONDS, _poll_health)
-
-    # Page visibility pause/resume for health polling
-    ui.add_body_html('''
-    <script>
-    document.addEventListener('visibilitychange', () => {
-        fetch('/api/visibility/' + (document.hidden ? 'hidden' : 'visible'));
-    });
-    </script>
-    ''')
-
-    # Initial health check
-    await _poll_health()
-
-
-@app.get('/api/visibility/hidden')
-async def visibility_hidden():
-    pass
-
-
-@app.get('/api/visibility/visible')
-async def visibility_visible():
-    global service_online
-    service_online = await svc.health()
+    # Initial health check (fire-and-forget, won't block page loads)
+    background_tasks.create(_health_poll_loop(), name='health-poll')
 
 
 ui.run(
