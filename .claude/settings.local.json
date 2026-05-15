@@ -45,7 +45,10 @@
       "Bash(curl -sL --max-time 15 \"https://api.github.com/repos/chenglou/pretext/git/trees/HEAD?recursive=1\")",
       "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/pretext.css\")",
       "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/\")",
-      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/README.md\")"
+      "Bash(curl -sL --max-time 10 \"https://cdn.jsdelivr.net/gh/chenglou/pretext@master/README.md\")",
+      "Bash(taskkill //PID 1332 //F)",
+      "WebFetch(domain:chenglou.me)",
+      "Bash(curl -sL --max-time 10 \"https://chenglou.me/pretext/\")"
     ]
   }
 }
