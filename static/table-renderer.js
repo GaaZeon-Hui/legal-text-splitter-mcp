@@ -26,16 +26,18 @@ function truncIdx(mod, text, font, maxW) {
 function fallback(root) {
     if (!root) return;
     const ROWS = window.__ROWS || [];
-    const DETAIL = window.__DETAIL || {};
-    let h = '<table class="pt-t"><thead><tr>'
-        + '<th class="pt-c1">#</th><th>内容</th>'
+    let h = '<table class="pt-t"><colgroup>'
+        + '<col style="width:48px"><col><col style="width:80px">'
+        + '<col style="width:48px"><col style="width:80px">'
+        + '</colgroup><thead><tr>'
+        + '<th class="pt-c1">#</th><th class="pt-c2">内容</th>'
         + '<th class="pt-c3">类型</th><th class="pt-c4">层级</th>'
         + '<th class="pt-c5">序数</th></tr></thead><tbody>';
     for (const r of ROWS) {
         const fl = String(r[1]).split('\n')[0] || '';
         h += '<tr data-seq="' + esc(String(r[0])) + '">'
             + '<td class="pt-c1">' + esc(r[0]) + '</td>'
-            + '<td>' + esc(fl) + '</td>'
+            + '<td class="pt-c2">' + esc(fl) + '</td>'
             + '<td class="pt-c3">' + esc(r[2]) + '</td>'
             + '<td class="pt-c4">' + esc(r[3]) + '</td>'
             + '<td class="pt-c5">' + esc(r[4]) + '</td>'
@@ -43,6 +45,7 @@ function fallback(root) {
     }
     h += '</tbody></table>';
     root.innerHTML = h;
+    attachClick(root);
 }
 
 async function render(mod) {
@@ -51,23 +54,29 @@ async function render(mod) {
     const root = document.getElementById('pt-root');
     if (!root) return;
 
-    const cw = root.clientWidth - 44 - 72 - 56 - 88 - 24;
-    if (!mod || cw < 80) {
-        fallback(root);
-        return;
-    }
+    if (!mod) { fallback(root); return; }
 
     const { prepare, layout } = mod;
+    // Measure fixed-column max widths + content width available
+    const totalW = root.clientWidth - 24;
+    const colW = _measureFixedCols(mod, ROWS);
+    const cw = totalW - colW.seq - colW.type - colW.level - colW.ordinal;
+    if (cw < 80) { fallback(root); return; }
 
-    // Pre-measure all fragment texts via canvas
+    // Pre-measure all fragment texts via canvas for content column
     const pp = [];
     for (let i = 0; i < ROWS.length; i++) {
         pp.push({ i, prep: prepare(String(ROWS[i][1]), FONT) });
     }
 
-    // Render table
-    let h = '<table class="pt-t"><thead><tr>'
-        + '<th class="pt-c1">#</th><th>内容</th>'
+    let h = '<table class="pt-t"><colgroup>'
+        + '<col style="width:' + colW.seq + 'px">'
+        + '<col style="width:' + cw + 'px">'
+        + '<col style="width:' + colW.type + 'px">'
+        + '<col style="width:' + colW.level + 'px">'
+        + '<col style="width:' + colW.ordinal + 'px">'
+        + '</colgroup><thead><tr>'
+        + '<th class="pt-c1">#</th><th class="pt-c2">内容</th>'
         + '<th class="pt-c3">类型</th><th class="pt-c4">层级</th>'
         + '<th class="pt-c5">序数</th></tr></thead><tbody>';
 
@@ -81,11 +90,11 @@ async function render(mod) {
         } else {
             const firstLine = String(r[1]).split('\n')[0];
             const idx = truncIdx(mod, firstLine, FONT, cw);
-            display = firstLine.substring(0, idx) + '…';  // ellipsis
+            display = firstLine.substring(0, idx) + '…';
         }
         h += '<tr data-seq="' + esc(String(r[0])) + '">'
             + '<td class="pt-c1">' + esc(r[0]) + '</td>'
-            + '<td>' + esc(display) + '</td>'
+            + '<td class="pt-c2">' + esc(display) + '</td>'
             + '<td class="pt-c3">' + esc(r[2]) + '</td>'
             + '<td class="pt-c4">' + esc(r[3]) + '</td>'
             + '<td class="pt-c5">' + esc(r[4]) + '</td>'
@@ -93,12 +102,49 @@ async function render(mod) {
     }
     h += '</tbody></table>';
     root.innerHTML = h;
+    attachClick(root);
+}
 
-    // Click → detail dialog
+// Measure fixed column widths based on max content pixel width + padding
+function _measureFixedCols(mod, ROWS) {
+    const { prepare, layout } = mod;
+    const F = FONT;
+    const pad = 28; // 12px padding each side + 2px border
+
+    function maxPx(colIdx) {
+        let maxW = 0;
+        for (const r of ROWS) {
+            const t = String(r[colIdx] != null ? r[colIdx] : '');
+            const p = prepare(t, F);
+            const lr = layout(p, 400, 23);
+            // measureLineStats gives maxLineWidth
+            const { maxLineWidth } = mod.measureLineStats(p, 400);
+            if (maxLineWidth > maxW) maxW = maxLineWidth;
+        }
+        return Math.ceil(maxW + pad);
+    }
+
+    // Also measure header widths
+    function headerPx(text) {
+        const p = prepare(text, F);
+        const lr = layout(p, 400, 23);
+        const { maxLineWidth } = mod.measureLineStats(p, 400);
+        return Math.ceil(maxLineWidth + pad);
+    }
+
+    return {
+        seq: Math.max(maxPx(0), headerPx('序号'), 44),
+        type: Math.max(maxPx(2), headerPx('类型'), 56),
+        level: Math.max(maxPx(3), headerPx('层级'), 44),
+        ordinal: Math.max(maxPx(4), headerPx('序数'), 56),
+    };
+}
+
+function attachClick(root) {
     root.querySelector('tbody').addEventListener('click', function (ev) {
         const tr = ev.target.closest('tr');
         if (!tr) return;
-        const d = DETAIL[tr.dataset.seq];
+        const d = (window.__DETAIL || {})[tr.dataset.seq];
         if (d) window.__pd = d;
     });
 }
