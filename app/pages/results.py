@@ -68,9 +68,9 @@ def _build_pretext_table(fragments):
     }
     .pt-t tbody tr { cursor: pointer; }
     .pt-t tbody tr:hover td { background: #f6f6f9 !important; }
-    .pt-c1 { text-align: left; font-weight: 700; white-space: nowrap; }
+    .pt-c1 { text-align: center; font-weight: 700; white-space: nowrap; }
     .pt-c2 { text-align: left; }
-    .pt-c3, .pt-c4, .pt-c5 { text-align: right; white-space: nowrap; }
+    .pt-c3, .pt-c4, .pt-c5 { text-align: center; white-space: nowrap; }
     ''')
 
     # Build row data
