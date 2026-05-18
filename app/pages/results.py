@@ -46,8 +46,9 @@ def _build_pretext_table(fragments):
         '<div id="pt-root" class="pt-w"></div>'
     ).classes('w-full')
 
-    # CSS via NiceGUI's native method (more reliable than inline <style>)
-    ui.add_css('''
+    # CSS injected via add_head_html — guaranteed to be in DOM before JS renders table
+    ui.add_head_html('''
+    <style>
     .pt-w { width: 100%; overflow-x: auto; }
     .pt-t {
         width: 100%; border-collapse: collapse; table-layout: fixed;
@@ -58,7 +59,7 @@ def _build_pretext_table(fragments):
     }
     .pt-t th, .pt-t td {
         padding: 8px 12px; vertical-align: middle;
-        border: 1px solid #ddd !important;
+        border: 1px solid #ddd;
     }
     .pt-t thead th {
         font-weight: 500; font-size: 12px; color: #888; background: #fafafa;
@@ -67,10 +68,11 @@ def _build_pretext_table(fragments):
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .pt-t tbody tr { cursor: pointer; }
-    .pt-t tbody tr:hover td { background: #f6f6f9 !important; }
+    .pt-t tbody tr:hover td { background: #f6f6f9; }
     .pt-c1 { text-align: center; font-weight: 700; white-space: nowrap; }
     .pt-c2 { text-align: left; }
     .pt-c3, .pt-c4, .pt-c5 { text-align: center; white-space: nowrap; }
+    </style>
     ''')
 
     # Build row data

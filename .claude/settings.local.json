@@ -70,7 +70,11 @@
       "Bash(taskkill //PID 29512 //F)",
       "Bash(taskkill //PID 22616 //F)",
       "Bash(taskkill //PID 10924 //F)",
-      "Bash(taskkill //PID 19372 //F)"
+      "Bash(taskkill //PID 19372 //F)",
+      "Bash(taskkill //PID 9308 //F)",
+      "Bash(curl -s http://127.0.0.1:8080/static/table-renderer.js)",
+      "Bash(curl -s http://127.0.0.1:8080/)",
+      "Bash(curl -s http://127.0.0.1:8080/results)"
     ]
   }
 }
