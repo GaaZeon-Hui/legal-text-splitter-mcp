@@ -49,29 +49,34 @@ def _build_pretext_table(fragments):
     # CSS injected via add_head_html — guaranteed to be in DOM before JS renders table
     ui.add_head_html('''
     <style>
-    .pt-w { width: 100%; overflow-x: auto; }
-    .pt-t {
-        width: 100%; border-collapse: collapse; table-layout: fixed;
+    #pt-root .pt-w { width: 100%; overflow-x: auto; }
+    #pt-root .pt-t {
+        width: 100%; border-collapse: collapse; table-layout: fixed !important;
         font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
                      "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
         font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
         color: #1a1a1a;
     }
-    .pt-t th, .pt-t td {
-        padding: 8px 12px; vertical-align: middle;
-        border: 1px solid #ddd;
+    #pt-root .pt-t th, #pt-root .pt-t td {
+        padding: 8px 12px; vertical-align: middle !important;
+        border: 1px solid #ddd !important;
     }
-    .pt-t thead th {
+    #pt-root .pt-t thead th {
         font-weight: 500; font-size: 12px; color: #888; background: #fafafa;
     }
-    .pt-t tbody td {
+    #pt-root .pt-t tbody td {
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .pt-t tbody tr { cursor: pointer; }
-    .pt-t tbody tr:hover td { background: #f6f6f9; }
-    .pt-c1 { text-align: center; font-weight: 700; white-space: nowrap; }
-    .pt-c2 { text-align: left; }
-    .pt-c3, .pt-c4, .pt-c5 { text-align: center; white-space: nowrap; }
+    #pt-root .pt-t tbody tr { cursor: pointer; }
+    #pt-root .pt-t tbody tr:hover td { background: #f6f6f9; }
+    #pt-root .pt-c1 { text-align: center !important; font-weight: 700 !important; white-space: nowrap; }
+    #pt-root .pt-c2 { text-align: left !important; }
+    #pt-root .pt-c3, #pt-root .pt-c4, #pt-root .pt-c5 { text-align: center !important; white-space: nowrap; }
+    /* column width enforcement */
+    #pt-root .pt-t th:nth-child(1), #pt-root .pt-t td:nth-child(1) { width: 52px !important; }
+    #pt-root .pt-t th:nth-child(3), #pt-root .pt-t td:nth-child(3) { width: 72px !important; }
+    #pt-root .pt-t th:nth-child(4), #pt-root .pt-t td:nth-child(4) { width: 56px !important; }
+    #pt-root .pt-t th:nth-child(5), #pt-root .pt-t td:nth-child(5) { width: 80px !important; }
     </style>
     ''')
 
