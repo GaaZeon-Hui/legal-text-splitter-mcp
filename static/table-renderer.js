@@ -23,10 +23,10 @@ function truncIdx(mod, text, font, maxW) {
     return lo;
 }
 
-function colgroup(contentW) {
+function colgroup() {
     return '<colgroup>'
         + '<col style="width:' + COL_W.seq + 'px">'
-        + '<col style="width:' + (contentW || 'auto') + 'px">'
+        + '<col>'  // content: no width — fills remaining space
         + '<col style="width:' + COL_W.type + 'px">'
         + '<col style="width:' + COL_W.level + 'px">'
         + '<col style="width:' + COL_W.ordinal + 'px">'
@@ -43,7 +43,7 @@ function thead() {
 function fallback(root) {
     if (!root) return;
     const ROWS = window.__ROWS || [];
-    let h = '<table class="pt-t">' + colgroup('auto') + thead() + '<tbody>';
+    let h = '<table class="pt-t">' + colgroup() + thead() + '<tbody>';
     for (const r of ROWS) {
         const fl = String(r[1]).split('\n')[0] || '';
         h += '<tr data-seq="' + esc(String(r[0])) + '">'
@@ -76,7 +76,7 @@ async function render(mod) {
         pp.push({ i, prep: prepare(String(ROWS[i][1]), FONT) });
     }
 
-    let h = '<table class="pt-t">' + colgroup(contentW) + thead() + '<tbody>';
+    let h = '<table class="pt-t">' + colgroup() + thead() + '<tbody>';
     for (let i = 0; i < ROWS.length; i++) {
         const r = ROWS[i];
         const pm = pp[i];
