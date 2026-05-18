@@ -76,7 +76,10 @@
       "Bash(curl -s http://127.0.0.1:8080/)",
       "Bash(curl -s http://127.0.0.1:8080/results)",
       "Bash(taskkill //PID 12508 //F)",
-      "Bash(taskkill //PID 14100 //F)"
+      "Bash(taskkill //PID 14100 //F)",
+      "Bash(taskkill //FI \"WINDOWTITLE eq python*\" //F)",
+      "Bash(taskkill //PID 25424 //F)",
+      "Bash(taskkill //PID 19708 //F)"
     ]
   }
 }
