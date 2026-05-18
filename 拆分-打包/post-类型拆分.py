@@ -63,12 +63,6 @@ _TRANSITION_FALLBACK_PATTERNS = [
 
 if not type_patterns: raise ValueError("请至少选择一种拆分关键词类型！")
 
-def get_ordinal(content):
-    for _, pat, func in type_patterns:
-        m = pat.match(content)
-        if m: return func(m)
-    return None
-
 def find_split_point_for_types(content, type_names):
     for name, pat, func, m in iter_matches(type_patterns, content, type_names=type_names):
             start = m.start()
