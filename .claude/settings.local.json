@@ -79,7 +79,15 @@
       "Bash(taskkill //PID 14100 //F)",
       "Bash(taskkill //FI \"WINDOWTITLE eq python*\" //F)",
       "Bash(taskkill //PID 25424 //F)",
-      "Bash(taskkill //PID 19708 //F)"
+      "Bash(taskkill //PID 19708 //F)",
+      "Bash(Select-Object -First 20)",
+      "Bash(lua -v)",
+      "Bash(winget --version)",
+      "Bash(winget search *)",
+      "Bash(winget install *)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Programs\\\\Lua\\\\bin\\\\lua.exe\" -v)",
+      "PowerShell(lua -v)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); lua -v)"
     ]
   }
 }

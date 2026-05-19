@@ -271,32 +271,24 @@ def analyze(text):
     返回与 print_report() 相同结构的 dict:
         {spine_types, satellite_types, all_tags, max_n, max_gc, is_plain, ...}
     """
+    # 打分子集：与拆分引擎 global_backward_rollback + 条二次回卷 的序数入口一致
+    SCORED_TYPES = {"条", "数字条", "数字点", "数字点点",
+                    "数字直连中文", "数字空格", "数字节"}
+
     # 1. 保护块 → 全量匹配（一次过，不重复）
     protected, _ = apply_protection_blocks(text)
     patterns = build_type_patterns(SPLIT_TYPES)
 
-    # 收集原始 matches（单次模式匹配，含保护块结果）
+    # 收集原始 matches（通过共享 iter_matches，过滤器与拆分引擎一致）
     all_raw = []
-    LEFT_BRACKETS = set('\u2018\u201c\u300c\u300e\u300a\u3008\uff08[(\u3014\uff62')
-    for name, pat, func in patterns:
-        for m in pat.finditer(protected):
-            # 跳过前有左引号/括号（隔空白），防止 " 一、 "\\n一、 误识别
-            if m.start() > 0:
-                j = m.start() - 1
-                while j >= 0 and protected[j] in ' \t\n\r\u3000\u00a0':
-                    j -= 1
-                if j >= 0 and protected[j] in LEFT_BRACKETS:
-                    continue
-            try:
-                val = func(m)
-                if val is None:
-                    continue
-                all_raw.append((name, m.group(), m.start(), m.end(), val))
-            except Exception:
-                if __debug__:
-                    import sys
-                    print(f"  [WARN] {name}: extractor error for {m.group()[:60]}", file=sys.stderr)
+    for name, _pat, func, m in iter_matches(patterns, protected, type_names=SCORED_TYPES):
+        try:
+            val = func(m)
+            if val is None:
                 continue
+            all_raw.append((name, m.group(), m.start(), m.end(), val))
+        except Exception:
+            continue
 
     # 2. 重叠区间去重（类型优先级：数字直连中文 > 数字点 > 其他）
     TYPE_PRIORITY = {"数字直连中文": 0, "数字点": 1, "数字点点": 1}
