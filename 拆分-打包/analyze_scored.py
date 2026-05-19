@@ -357,20 +357,72 @@ def analyze(text):
     }
 
 
-# 便捷入口
+# ======================================================================
+#  入口 — 完全复刻流水线调用路径，保证终端与流水线打分一致
+# ======================================================================
 if __name__ == '__main__':
     import sys
+    import os
+    from importlib import util as _iu
+
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+
+    _ps = _iu.spec_from_file_location(
+        '_post', os.path.join(_HERE, 'post-类型拆分.py'))
+    _pm = _iu.module_from_spec(_ps)
+    _ps.loader.exec_module(_pm)
+    clean_html = _pm.clean_html
+
+    def _fetch_from_db(law_id):
+        try:
+            import pymysql
+        except ImportError:
+            print("pymysql 未安装，请执行 pip install pymysql")
+            sys.exit(1)
+        DB_CONFIG = {
+            "host": "192.168.1.109",
+            "port": 8001,
+            "user": "xoops_root",
+            "password": "654321",
+            "database": "mtai_serv",
+        }
+        conn = pymysql.connect(**DB_CONFIG)
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT attachment_url FROM mt_kb_law_metadata WHERE law_id = %s",
+                    (law_id,))
+                res = cursor.fetchone()
+                if not res or not res[0]:
+                    print(f"未找到 law_id: {law_id}")
+                    sys.exit(1)
+                return res[0]
+        finally:
+            conn.close()
+
     if len(sys.argv) < 2:
         print("用法: python analyze_scored.py <文件路径>")
+        print("      python analyze_scored.py --id <law_id>")
         sys.exit(1)
-    with open(sys.argv[1], 'r', encoding='utf-8') as f:
-        text = f.read()
+
+    if sys.argv[1] == "--id" and len(sys.argv) > 2:
+        law_id = sys.argv[2]
+        print(f"从数据库拉取 law_id={law_id} ...")
+        raw_text = _fetch_from_db(law_id)
+        text = clean_html(raw_text)
+        text, _ = apply_protection_blocks(text)
+        print(f"原始长度: {len(raw_text)} 字符, 清洗后: {len(text)} 字符")
+    else:
+        with open(sys.argv[1], 'r', encoding='utf-8') as f:
+            text = f.read()
+        text = clean_html(text)
+        text, _ = apply_protection_blocks(text)
+
     report = analyze(text)
     print(f"推荐类型: {report['all_tags']}")
     print(f"脊椎: {report['spine_types']} 附生: {report['satellite_types']}")
     total = sum(1 for k in report['_kept_mask'] if k)
     print(f"序数: {len(report['_ords'])} → 保留: {total}")
-    # 详细输出
     for i, (o, kept, score) in enumerate(zip(report['_ords'], report['_kept_mask'], report['_scores']), start=1):
         flag = "✓" if kept else ""
         print(f"  {i:>4} {o:<12} {score:>8.1f}  | {flag}")
