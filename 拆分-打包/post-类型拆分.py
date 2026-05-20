@@ -156,6 +156,7 @@ def _path_b_mark(tp, group, group_data):
     to_rollback = set()
 
     # 1. 建堆：按 seq 物理顺序，相邻且序数连续则同堆
+    #    重复序数：后者替换前者在堆中的位置，前者标记回卷
     heaps = []
     current = []
     for r, last in group:  # group 已按 seq 排序
@@ -163,6 +164,10 @@ def _path_b_mark(tp, group, group_data):
             current = [(r, last)]
         elif last == current[-1][1] + 1:
             current.append((r, last))
+        elif last == current[-1][1]:
+            replaced_r, _ = current[-1]
+            to_rollback.add(replaced_r["uid"])
+            current[-1] = (r, last)
         else:
             heaps.append(current)
             current = [(r, last)]
