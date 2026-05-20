@@ -24,6 +24,7 @@ _pipeline_spec.loader.exec_module(_pipeline_mod)
 
 process_text = _pipeline_mod.process_text
 infer_type_levels = _pipeline_mod.infer_type_levels
+get_ordinal = _pipeline_mod.get_ordinal
 
 from analyze_split_types import _format_level_chain
 
@@ -59,7 +60,7 @@ def split_text(text: str) -> dict:
             'content': frag.get('content', ''),
             'split_type': frag.get('split_type'),
             'index_level': frag.get('index_level'),
-            'ordinal': None,
+            'ordinal': get_ordinal(frag.get('content', '')),
         })
 
     # Build meta from analysis report

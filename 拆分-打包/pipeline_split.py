@@ -87,6 +87,7 @@ _apply_protection = _mod_post._apply_protection_blocks
 _restore_placeholders = _mod_post._restore_placeholders
 split_single_group_with_rollback = _mod_post.split_single_group_with_rollback
 split_plain_by_paragraphs = _mod_post.split_plain_by_paragraphs
+get_ordinal = _mod_post.get_ordinal
 
 
 # ====================================================================
