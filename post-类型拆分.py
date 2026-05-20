@@ -10,6 +10,7 @@ except ImportError:
 from _protection_config import apply_protection_blocks as _apply_protection_blocks
 from _protection_config import _restore_placeholders
 from _type_patterns_config import build_type_patterns, iter_matches, PATH_B_TYPES
+from analyze_scored import score_ordinals
 
 
 def split_plain_by_paragraphs(text):
@@ -34,6 +35,12 @@ SPLIT_TYPES = [
     "数字点", "数字点点", "数字直连中文",
     "中文是", "要素数字冒号",
 ]
+
+# ---- 打分引擎拦截类型：这些类型不走 Path A/B，只走打分 ----
+SCORED_TYPES = {
+    "条", "数字条", "数字点", "数字点点",
+    "数字直连中文", "数字空格", "数字节",
+}
 
 # 数据库路径配置：
 DB_PRIMARY_TYPE = "条"
@@ -76,6 +83,47 @@ def find_split_point_for_types(content, type_names):
             if pre.strip() != "":
                 return pre, content[start:], name
     return None
+
+# ===== 打分路径：拦截 SCORED_TYPES，替代 Path A/B =====
+def _scoring_path_combined(group_data, split_type_order):
+    """对所有 SCORED_TYPES 的行合并打分，返回 {tp: set of uid} 标记。
+
+    合并打分保证跨类型的层级关系（如 '3' 与 '3.1'）不丢失。
+    """
+    scored_used = [tp for tp in split_type_order if tp in SCORED_TYPES]
+    if not scored_used:
+        return {}
+
+    all_rows = [r for r in group_data if r.get("split_type") in SCORED_TYPES]
+    if len(all_rows) < 2:
+        return {}
+
+    all_rows.sort(key=lambda x: x["seq"])
+
+    ord_strs = []
+    mapped = []
+    for r in all_rows:
+        o = get_ordinal(r["content"])
+        if o is None:
+            continue
+        mapped.append(r)
+        if isinstance(o, tuple):
+            ord_strs.append('.'.join(str(x) for x in o))
+        else:
+            ord_strs.append(str(o))
+
+    if len(ord_strs) < 2:
+        return {}
+
+    scores, kept_mask = score_ordinals(ord_strs)
+
+    marks = {}
+    for r, keep in zip(mapped, kept_mask):
+        if not keep:
+            tp = r.get("split_type")
+            if tp:
+                marks.setdefault(tp, set()).add(r["uid"])
+    return marks
 
 # ===== 全局后向回卷 =====
 def _ordinal_prefix(ord_val):
@@ -250,7 +298,14 @@ def global_backward_rollback(group_data, group_name, split_type_order):
     # ---- Phase 1: 每个类型独立建堆 + 标记（同类型入堆，同类型标记） ----
     all_marks = {}  # {tp: set of uids}
 
+    # 打分拦截：SCORED_TYPES 合并打分，跳过 Path A/B
+    scored_marks = _scoring_path_combined(group_data, split_type_order)
+    all_marks.update(scored_marks)
+
     for tp in split_type_order:
+        if tp in SCORED_TYPES:
+            continue  # 已由打分引擎处理
+
         rows = [r for r in group_data if r.get("split_type") == tp]
         if len(rows) < 2:
             continue
