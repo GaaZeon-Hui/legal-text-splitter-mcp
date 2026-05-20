@@ -326,6 +326,15 @@ def analyze(text):
                     dunhao_entry["suppress_reason"] = f"包容抑制({parent_name})"
                     break
 
+    # ---- 数字空格直连中文包容抑制 ----
+    # 数字直连中文已覆盖"数字+中文"模式，数字空格匹配的"表1 表2"等
+    # 短序号在合并打分池中会污染数字点的兄弟关系链，直接抑制。
+    if results["数字直连中文"]["count"] > 0:
+        sk_entry = results.get("数字空格")
+        if sk_entry and sk_entry["count"] > 0:
+            sk_entry["suppressed"] = True
+            sk_entry["suppress_reason"] = "直连中文包容抑制"
+
     # ---- 条包裹抑制 ----
     tiao_entry = results.get("条")
     if tiao_entry and tiao_entry["count"] > 0 and tiao_entry["max_n"] <= 4:
@@ -680,11 +689,11 @@ def print_report(results, text="", law_id=None, quiet=False):
         suffix = "  [已抑制]" if suppressed else ""
         _p(f"  {name:<14} {cnt:<7} {str(gc):<5} {str(mn):<6} {ord_summary:<30}{suffix}")
 
-    # 中文顿号特殊规则：max_n >= 2 即可推荐（放宽 gc/max_n 门槛）
+    # 中文顿号特殊规则：有一组且 max_n >= 2 即可推荐（极低门槛）
     if "中文顿号" not in qualifying:
         e = results["中文顿号"]
         if (not e.get("suppressed", False)
-            and e["count"] >= 3
+            and e["group_count"] >= 1
             and e["max_n"] >= 2):
             qualifying["中文顿号"] = {"max_n": e["max_n"], "group_count": e["group_count"]}
 
