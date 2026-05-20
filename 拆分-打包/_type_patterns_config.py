@@ -268,7 +268,7 @@ def iter_matches(patterns, text, type_names=None, extra_filters=None):
 # ==================== 路径B类型列表（回卷标记相关） ====================
 # 这些类型的组标记由 compute_group_marks 计算，供路径B二次回卷使用。
 PATH_B_TYPES = frozenset({
-    "\u6761", "\u7ae0", "\u8282", "\u7f16", "\u90e8\u5206", "\u4e2d\u6587\u987f\u53f7",
+    "\u7ae0", "\u8282", "\u7f16", "\u90e8\u5206", "\u4e2d\u6587\u987f\u53f7",
     "\u6570\u5b57\u6761", "\u6570\u5b57\u7ae0", "\u6570\u5b57\u8282", "\u6570\u5b57\u76f4\u8fde\u4e2d\u6587",
     "\u6570\u5b57\u7a7a\u683c", "\u4e2d\u6587\u662f", "\u8981\u7d20\u6570\u5b57\u5192\u53f7",
 })

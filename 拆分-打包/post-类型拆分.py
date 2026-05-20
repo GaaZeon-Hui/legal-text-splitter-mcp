@@ -38,7 +38,7 @@ SPLIT_TYPES = [
 
 # ---- 打分引擎拦截类型：这些类型不走 Path A/B，只走打分 ----
 SCORED_TYPES = {
-    "条", "数字条", "数字点", "数字点点",
+    "数字条", "数字点", "数字点点",
     "数字直连中文", "数字空格", "数字节",
 }
 
@@ -290,10 +290,33 @@ def _path_b_mark(tp, group, group_data):
             to_rollback.add(r["uid"])
 
     # 堆首元素不是 ordinal=1 → 整堆标记回卷
-    for heap in heap_info:
-        if heap["start_ord"] != 1:
-            for uid in heap["uids"]:
-                to_rollback.add(uid)
+    # 条例外：不走堆首判断，改为独立打分决定保留/回卷
+    if tp == "条":
+        survivors = []
+        for heap in heap_info:
+            for r, _ in group:
+                if r["uid"] in heap["uids"] and r["uid"] not in to_rollback:
+                    survivors.append(r)
+        if len(survivors) >= 2:
+            ord_strs = []
+            for r in survivors:
+                o = get_ordinal(r["content"])
+                if o is None:
+                    continue
+                if isinstance(o, tuple):
+                    ord_strs.append('.'.join(str(x) for x in o))
+                else:
+                    ord_strs.append(str(o))
+            if len(ord_strs) >= 2:
+                scores, kept_mask = score_ordinals(ord_strs)
+                for r, keep in zip(survivors, kept_mask):
+                    if not keep:
+                        to_rollback.add(r["uid"])
+    else:
+        for heap in heap_info:
+            if heap["start_ord"] != 1:
+                for uid in heap["uids"]:
+                    to_rollback.add(uid)
 
     return to_rollback
 
