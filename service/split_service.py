@@ -1,177 +1,84 @@
-"""Thin wrapper around the existing analysis + split pipeline.
+"""Thin wrapper around the engine pipeline.
 
-Exposes a single entry point split_text(text, params) -> dict
-that the FastAPI endpoint calls directly.
+Does NOT process text itself — injects raw text into the engine
+and captures output at the engine's processing boundary.
 """
 import sys
 import os
 import time
 
-# Ensure parent directory is on sys.path so existing modules are importable
 _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
-from _protection_config import apply_protection_blocks, _restore_placeholders
-from _type_patterns_config import build_type_patterns
-from analyze_scored import analyze as analyze_scored
-from analyze_split_types import analyze as analyze_legacy
-from analyze_split_types import print_report, infer_type_levels
+_ENGINE = os.path.join(_PARENT, '拆分-打包')
+if _ENGINE not in sys.path:
+    sys.path.insert(0, _ENGINE)
 
-# post-类型拆分 uses Chinese filename — import via importlib
 from importlib import util as _importlib_util
-_post_spec = _importlib_util.spec_from_file_location(
-    'post_split', os.path.join(_PARENT, 'post-类型拆分.py'))
-_post_mod = _importlib_util.module_from_spec(_post_spec)
-_post_spec.loader.exec_module(_post_mod)
 
-clean_html = _post_mod.clean_html
-split_plain_by_paragraphs = _post_mod.split_plain_by_paragraphs
-split_single_group_with_rollback = _post_mod.split_single_group_with_rollback
+_pipeline_spec = _importlib_util.spec_from_file_location(
+    'pipeline_split', os.path.join(_ENGINE, 'pipeline_split.py'))
+_pipeline_mod = _importlib_util.module_from_spec(_pipeline_spec)
+_pipeline_spec.loader.exec_module(_pipeline_mod)
 
-# Also need _format_level_chain (defined in analyze_split_types, not exported)
+process_text = _pipeline_mod.process_text
+infer_type_levels = _pipeline_mod.infer_type_levels
+
 from analyze_split_types import _format_level_chain
-
-
-_ORDINAL_PATTERN_CACHE = {}
-
-def _extract_ordinal(content, split_type):
-    """Extract the ordinal value from a fragment's content based on its split_type.
-
-    Patterns are cached per split_type to avoid rebuilding compiled regex for
-    every fragment in large documents (the caller loops over all fragments).
-    """
-    if not split_type:
-        return None
-    try:
-        if split_type not in _ORDINAL_PATTERN_CACHE:
-            _ORDINAL_PATTERN_CACHE[split_type] = build_type_patterns([split_type])
-        patterns = _ORDINAL_PATTERN_CACHE[split_type]
-        for name, pat, func in patterns:
-            m = pat.match(content)
-            if m:
-                val = func(m)
-                if val is not None:
-                    return val
-        return None
-    except (AttributeError, TypeError):
-        return None
-
 
 MAX_FRAGMENTS = 10000
 
 
-def split_text(text: str, params: dict | None = None) -> dict:
-    """Execute full analysis + split pipeline.
+def split_text(text: str) -> dict:
+    """Execute full engine pipeline on raw text.
 
-    Args:
-        text: Raw legal document text (may contain HTML).
-        params: Optional algorithm parameters:
-            - algorithm: 'scored' (default) | 'legacy'
-            - split_types: None (auto-detect) | ['条', '章', ...]
-            - min_fragment_chars: 10 (default)
-
-    Returns:
-        dict with 'fragments' (list) and 'meta' (dict).
+    Injects text into the engine and captures the result at the boundary.
+    The engine handles: analyze → protect → split → restore → infer levels.
     """
-    if params is None:
-        params = {}
-
-    algorithm = params.get('algorithm', 'scored')
-    split_types_override = params.get('split_types')
-    # min_fragment_chars is reserved for future use
-
-    # 1. Clean HTML
-    cleaned = clean_html(text)
-
-    # 2. Apply protection blocks
-    protected, blocks = apply_protection_blocks(cleaned)
-
-    # 3. Analyze
-    if algorithm == 'scored':
-        report = analyze_scored(protected)
-    else:
-        raw_results = analyze_legacy(protected)
-        report = print_report(raw_results, protected, quiet=True)
-
-    all_tags = report.get('all_tags', [])
-    is_plain = report.get('is_plain', False)
-
-    # Override split types if specified
-    if split_types_override is not None:
-        all_tags = split_types_override
-        is_plain = False
-
-    # 4. Split
     t0 = time.time()
 
-    if is_plain or not all_tags or all_tags == ['纯文本']:
-        gdata = [{
-            'group': 'input', 'seq': 1,
-            'content': protected, 'extra': None,
-            'source_id': 0, 'split_type': None,
-        }]
-    elif '纯文本段落拆分' in all_tags:
-        paragraphs = split_plain_by_paragraphs(protected)
-        gdata = []
-        for i, p in enumerate(paragraphs):
-            gdata.append({
-                'group': 'input', 'seq': i + 1,
-                'content': p, 'extra': None,
-                'source_id': 0, 'split_type': None,
-            })
-        other_types = [t for t in all_tags if t != '纯文本段落拆分']
-        if other_types:
-            gdata = split_single_group_with_rollback(
-                gdata, 'input', split_types_override=other_types, verbose=False)
-    else:
-        gdata = [{
-            'group': 'input', 'seq': 1,
-            'content': protected, 'extra': None,
-            'source_id': 0, 'split_type': None,
-        }]
-        gdata = split_single_group_with_rollback(
-            gdata, 'input', split_types_override=all_tags, verbose=False)
+    engine_result = process_text(text)
 
+    if engine_result["error"]:
+        raise RuntimeError(engine_result["error"])
+
+    gdata = engine_result["split_results"]
+    analysis = engine_result["analysis"]
     processing_ms = int((time.time() - t0) * 1000)
 
-    # 5. Check fragment count
     if len(gdata) > MAX_FRAGMENTS:
         raise ValueError(
             f'文本过大，片段数 {len(gdata)} 超过上限 {MAX_FRAGMENTS}，建议拆分后重试')
 
-    # 6. Restore protection block placeholders
-    for frag in gdata:
-        frag['content'] = _restore_placeholders(frag['content'], blocks)
-
-    # 7. Infer type index levels
-    type_levels = infer_type_levels(gdata)
-
-    # 8. Build fragment list
+    # Build fragments in API format
     fragments = []
     for frag in gdata:
-        st = frag.get('split_type')
-        ordinal = _extract_ordinal(frag['content'], st)
         fragments.append({
             'seq': len(fragments) + 1,
-            'content': frag['content'],
-            'split_type': st,
-            'index_level': type_levels.get(st),
-            'ordinal': ordinal,
+            'content': frag.get('content', ''),
+            'split_type': frag.get('split_type'),
+            'index_level': frag.get('index_level'),
+            'ordinal': None,
         })
 
-    # 9. Build meta
-    chain_str, _ = _format_level_chain(type_levels)
+    # Build meta from analysis report
+    level_chain = '-'
+    level_count = 0
+    all_tags = engine_result.get('split_types', [])
+    if all_tags:
+        type_levels = infer_type_levels(gdata)
+        level_chain, level_count = _format_level_chain(type_levels)
 
     return {
         'fragments': fragments,
         'meta': {
             'char_count': len(text),
             'fragment_count': len(fragments),
-            'spine_types': report.get('spine_types', []),
+            'spine_types': analysis.get('spine_types', []),
             'all_tags': all_tags,
-            'level_chain': chain_str,
+            'level_chain': level_chain,
             'processing_ms': processing_ms,
-            'algorithm': algorithm,
+            'algorithm': 'engine',
         },
     }

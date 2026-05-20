@@ -358,7 +358,7 @@ def analyze(text):
 
 
 # ======================================================================
-#  入口 — 跑完整拆分流水线，从 _scoring_path_combined 截取真实打分
+#  入口 — 注入原文到引擎 process_text()，截取真实打分
 # ======================================================================
 if __name__ == '__main__':
     import sys
@@ -368,18 +368,10 @@ if __name__ == '__main__':
     _HERE = os.path.dirname(os.path.abspath(__file__))
 
     _ps = _iu.spec_from_file_location(
-        '_post_engine', os.path.join(_HERE, 'post-类型拆分.py'))
+        '_pipeline', os.path.join(_HERE, 'pipeline_split.py'))
     _pm = _iu.module_from_spec(_ps)
     _ps.loader.exec_module(_pm)
-
-    clean_html = _pm.clean_html
-    split_single_group_with_rollback = _pm.split_single_group_with_rollback
-    parse_and_reorder = _pm.parse_and_reorder
-    _SPLIT_TYPES = _pm.SPLIT_TYPES
-
-    from _protection_config import apply_protection_blocks, _restore_placeholders
-
-    DB_PRIMARY_TYPE = "条"
+    process_text = _pm.process_text
 
     def _fetch_from_db(law_id):
         try:
@@ -417,42 +409,21 @@ if __name__ == '__main__':
         law_id = sys.argv[2]
         print(f"从数据库拉取 law_id={law_id} ...")
         raw_text = _fetch_from_db(law_id)
-        text = clean_html(raw_text)
-        print(f"原始长度: {len(raw_text)} 字符, 清洗后: {len(text)} 字符")
+        print(f"原始长度: {len(raw_text)} 字符")
     else:
         with open(sys.argv[1], 'r', encoding='utf-8') as f:
-            text = f.read()
-        text = clean_html(text)
+            raw_text = f.read()
 
-    # 流水线：保护 → 重排 → 拆分 → 截取打分
-    protected, blocks = apply_protection_blocks(text)
-    reordered = parse_and_reorder(protected, DB_PRIMARY_TYPE)
-    if not reordered:
-        reordered = [protected]
-
-    gdata = []
-    for idx, content in enumerate(reordered, start=1):
-        gdata.append({
-            'group': 'input', 'seq': idx,
-            'content': content, 'extra': None,
-            'source_id': 0, 'split_type': None,
-        })
-
-    secondary = [tp for tp in _SPLIT_TYPES if tp != DB_PRIMARY_TYPE]
+    # 注入引擎，截取打分
     collector = {}
-    gdata = split_single_group_with_rollback(
-        gdata, 'input', split_types_override=secondary,
-        verbose=False, score_collector=collector)
+    result = process_text(raw_text, score_collector=collector)
 
-    for frag in gdata:
-        frag['content'] = _restore_placeholders(frag['content'], blocks)
+    if result["error"]:
+        print(f"引擎错误: {result['error']}")
+        sys.exit(1)
 
-    # 输出流水线真实打分
-    all_tags = sorted(set(
-        f.get('split_type') for f in gdata if f.get('split_type')
-    ))
-    print(f"最终拆分类型: {all_tags}")
-    print(f"拆分片段数: {len(gdata)}")
+    print(f"最终拆分类型: {result['split_types']}")
+    print(f"拆分片段数: {result['split_count']}")
 
     if collector.get('_ords'):
         ords = collector['_ords']
