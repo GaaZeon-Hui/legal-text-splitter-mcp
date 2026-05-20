@@ -10,6 +10,7 @@ except ImportError:
 from _protection_config import apply_protection_blocks as _apply_protection_blocks
 from _protection_config import _restore_placeholders
 from _type_patterns_config import build_type_patterns, iter_matches, PATH_B_TYPES
+from analyze_scored import score_ordinals
 
 
 def split_plain_by_paragraphs(text):
@@ -34,6 +35,12 @@ SPLIT_TYPES = [
     "数字点", "数字点点", "数字直连中文",
     "中文是", "要素数字冒号",
 ]
+
+# ---- 打分引擎拦截类型：这些类型不走 Path A/B，只走打分 ----
+SCORED_TYPES = {
+    "条", "数字条", "数字点", "数字点点",
+    "数字直连中文", "数字空格", "数字节",
+}
 
 # 数据库路径配置：
 DB_PRIMARY_TYPE = "条"
@@ -76,6 +83,57 @@ def find_split_point_for_types(content, type_names):
             if pre.strip() != "":
                 return pre, content[start:], name
     return None
+
+# ===== 打分路径：拦截 SCORED_TYPES，替代 Path A/B =====
+def _scoring_path_combined(group_data, split_type_order, score_collector=None):
+    """对所有 SCORED_TYPES 的行合并打分，返回 {tp: set of uid} 标记。
+
+    合并打分保证跨类型的层级关系（如 '3' 与 '3.1'）不丢失。
+
+    若 score_collector 传入，则写入打分明细：
+        score_collector[tp] = {"ords": [...], "scores": [...], "kept_mask": [...]}
+    """
+    scored_used = [tp for tp in split_type_order if tp in SCORED_TYPES]
+    if not scored_used:
+        return {}
+
+    all_rows = [r for r in group_data if r.get("split_type") in SCORED_TYPES]
+    if len(all_rows) < 2:
+        return {}
+
+    all_rows.sort(key=lambda x: x["seq"])
+
+    ord_strs = []
+    mapped = []
+    for r in all_rows:
+        o = get_ordinal(r["content"])
+        if o is None:
+            continue
+        mapped.append(r)
+        if isinstance(o, tuple):
+            ord_strs.append('.'.join(str(x) for x in o))
+        else:
+            ord_strs.append(str(o))
+
+    if len(ord_strs) < 2:
+        return {}
+
+    scores, kept_mask = score_ordinals(ord_strs)
+
+    # 外部收集器：暴露完整打分明细
+    if score_collector is not None:
+        score_collector["_ords"] = ord_strs
+        score_collector["_scores"] = scores
+        score_collector["_kept_mask"] = kept_mask
+        score_collector["_mapped"] = mapped
+
+    marks = {}
+    for r, keep in zip(mapped, kept_mask):
+        if not keep:
+            tp = r.get("split_type")
+            if tp:
+                marks.setdefault(tp, set()).add(r["uid"])
+    return marks
 
 # ===== 全局后向回卷 =====
 def _ordinal_prefix(ord_val):
@@ -240,7 +298,7 @@ def _path_b_mark(tp, group, group_data):
     return to_rollback
 
 
-def global_backward_rollback(group_data, group_name, split_type_order):
+def global_backward_rollback(group_data, group_name, split_type_order, score_collector=None):
     """
     Phase 1: 每个类型独立建堆+标记（同类型入堆，同类型标记）。
     Phase 2: 按 split_type_order 顺序逐类型回卷（从后往前）。
@@ -250,7 +308,14 @@ def global_backward_rollback(group_data, group_name, split_type_order):
     # ---- Phase 1: 每个类型独立建堆 + 标记（同类型入堆，同类型标记） ----
     all_marks = {}  # {tp: set of uids}
 
+    # 打分拦截：SCORED_TYPES 合并打分，跳过 Path A/B
+    scored_marks = _scoring_path_combined(group_data, split_type_order, score_collector)
+    all_marks.update(scored_marks)
+
     for tp in split_type_order:
+        if tp in SCORED_TYPES:
+            continue  # 已由打分引擎处理
+
         rows = [r for r in group_data if r.get("split_type") == tp]
         if len(rows) < 2:
             continue
@@ -858,7 +923,7 @@ def _path_b_secondary_rollback(group_data, group_name, split_type_order,
     return group_data
 
 # ===== 核心：分阶段拆分 + 增强回卷 =====
-def split_single_group_with_rollback(group_data, group_name, split_types_override=None, verbose=True):
+def split_single_group_with_rollback(group_data, group_name, split_types_override=None, verbose=True, score_collector=None):
     _v = (lambda *a, **kw: None) if not verbose else print
     uid_counter = 0
     for item in group_data:
@@ -911,7 +976,7 @@ def split_single_group_with_rollback(group_data, group_name, split_types_overrid
 
     # ---- 全局后向回卷 ----
     _v(f"  [{group_name}] 开始全局后向回卷...")
-    group_data = global_backward_rollback(group_data, group_name, split_type_list)
+    group_data = global_backward_rollback(group_data, group_name, split_type_list, score_collector)
     _v(f"    回卷结束，当前共 {len(group_data)} 行。")
 
     # ---- 括号类型二次回卷 ----

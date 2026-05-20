@@ -358,7 +358,7 @@ def analyze(text):
 
 
 # ======================================================================
-#  入口 — 完全复刻流水线调用路径，保证终端与流水线打分一致
+#  入口 — 跑完整拆分流水线，从 _scoring_path_combined 截取真实打分
 # ======================================================================
 if __name__ == '__main__':
     import sys
@@ -368,10 +368,18 @@ if __name__ == '__main__':
     _HERE = os.path.dirname(os.path.abspath(__file__))
 
     _ps = _iu.spec_from_file_location(
-        '_post', os.path.join(_HERE, 'post-类型拆分.py'))
+        '_post_engine', os.path.join(_HERE, 'post-类型拆分.py'))
     _pm = _iu.module_from_spec(_ps)
     _ps.loader.exec_module(_pm)
+
     clean_html = _pm.clean_html
+    split_single_group_with_rollback = _pm.split_single_group_with_rollback
+    parse_and_reorder = _pm.parse_and_reorder
+    _SPLIT_TYPES = _pm.SPLIT_TYPES
+
+    from _protection_config import apply_protection_blocks, _restore_placeholders
+
+    DB_PRIMARY_TYPE = "条"
 
     def _fetch_from_db(law_id):
         try:
@@ -410,19 +418,49 @@ if __name__ == '__main__':
         print(f"从数据库拉取 law_id={law_id} ...")
         raw_text = _fetch_from_db(law_id)
         text = clean_html(raw_text)
-        text, _ = apply_protection_blocks(text)
         print(f"原始长度: {len(raw_text)} 字符, 清洗后: {len(text)} 字符")
     else:
         with open(sys.argv[1], 'r', encoding='utf-8') as f:
             text = f.read()
         text = clean_html(text)
-        text, _ = apply_protection_blocks(text)
 
-    report = analyze(text)
-    print(f"推荐类型: {report['all_tags']}")
-    print(f"脊椎: {report['spine_types']} 附生: {report['satellite_types']}")
-    total = sum(1 for k in report['_kept_mask'] if k)
-    print(f"序数: {len(report['_ords'])} → 保留: {total}")
-    for i, (o, kept, score) in enumerate(zip(report['_ords'], report['_kept_mask'], report['_scores']), start=1):
-        flag = "✓" if kept else ""
-        print(f"  {i:>4} {o:<12} {score:>8.1f}  | {flag}")
+    # 流水线：保护 → 重排 → 拆分 → 截取打分
+    protected, blocks = apply_protection_blocks(text)
+    reordered = parse_and_reorder(protected, DB_PRIMARY_TYPE)
+    if not reordered:
+        reordered = [protected]
+
+    gdata = []
+    for idx, content in enumerate(reordered, start=1):
+        gdata.append({
+            'group': 'input', 'seq': idx,
+            'content': content, 'extra': None,
+            'source_id': 0, 'split_type': None,
+        })
+
+    secondary = [tp for tp in _SPLIT_TYPES if tp != DB_PRIMARY_TYPE]
+    collector = {}
+    gdata = split_single_group_with_rollback(
+        gdata, 'input', split_types_override=secondary,
+        verbose=False, score_collector=collector)
+
+    for frag in gdata:
+        frag['content'] = _restore_placeholders(frag['content'], blocks)
+
+    # 输出流水线真实打分
+    all_tags = sorted(set(
+        f.get('split_type') for f in gdata if f.get('split_type')
+    ))
+    print(f"最终拆分类型: {all_tags}")
+    print(f"拆分片段数: {len(gdata)}")
+
+    if collector.get('_ords'):
+        ords = collector['_ords']
+        scores = collector['_scores']
+        kept = collector['_kept_mask']
+        print(f"打分序数: {len(ords)} → 保留: {sum(kept)}")
+        for i, (o, k, s) in enumerate(zip(ords, kept, scores), start=1):
+            flag = "KEEP" if k else "DROP"
+            print(f"  {i:>4} {o:<12} {s:>8.1f}  | {flag}")
+    else:
+        print("(无 SCORED_TYPES 序数被打分)")
