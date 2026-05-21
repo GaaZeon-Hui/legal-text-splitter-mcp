@@ -95,14 +95,14 @@ class FileUpload:
 
     async def _handle_upload(self, e):
         """Process uploaded file, handle Excel column selection."""
-        raw = e.content.read()
+        raw = await e.file.read()
 
         if len(raw) > MAX_FILE_SIZE:
             ui.notify(f'文件过大，超过 50MB 限制', type='negative')
             self.upload.reset()
             return
 
-        ext = (e.name or '').lower()
+        ext = (e.file.name or '').lower()
         parsed = None
 
         try:
