@@ -87,6 +87,7 @@ _apply_protection = _mod_post._apply_protection_blocks
 _restore_placeholders = _mod_post._restore_placeholders
 split_single_group_with_rollback = _mod_post.split_single_group_with_rollback
 split_plain_by_paragraphs = _mod_post.split_plain_by_paragraphs
+get_ordinal = _mod_post.get_ordinal
 
 
 # ====================================================================
@@ -119,11 +120,15 @@ def _fetch_text(cursor, law_id):
 #  单条流水线
 # ====================================================================
 
-def process_single_law(law_id, conn, quiet=True):
-    """一条法律的完整流水线：拉取 → 分析 → 决策 → 拆分。
+def process_text(raw_text, law_id="input", score_collector=None, quiet=True):
+    """引擎核心：分析 → 决策 → 拆分。接受纯原文，无DB依赖。
 
     返回 dict:
         {law_id, analysis, split_types, split_count, split_results, error}
+
+    若 score_collector 传入，则透传给 split_single_group_with_rollback，
+    在 _scoring_path_combined 执行时写入打分明细。
+    quiet=False 时 print_report 输出分析详情到终端。
     """
     result = {
         "law_id": law_id,
@@ -135,20 +140,12 @@ def process_single_law(law_id, conn, quiet=True):
     }
 
     try:
-        # 1. 从DB拉取原始文本
-        with conn.cursor() as cursor:
-            raw_text = _fetch_text(cursor, law_id)
-        if not raw_text:
-            result["error"] = "未获取到文本"
-            return result
-
-        # 2. 分析拆分类型 — 走完整的 print_report(quiet=True) 拿到所有后处理规则的结果
+        # 1. 分析拆分类型
         raw_results = analyze(raw_text)
         analysis_report = print_report(raw_results, raw_text, law_id=law_id, quiet=quiet)
         result["analysis"] = analysis_report
 
         all_tags = analysis_report.get("all_tags", [])
-        # 拆分顺序：脊椎类型 → 附生类型 → 其余
         spine = analysis_report.get("spine_types", [])
         satellite = analysis_report.get("satellite_types", [])
         ordered = [t for t in (spine + satellite) if t in all_tags]
@@ -156,12 +153,11 @@ def process_single_law(law_id, conn, quiet=True):
         all_tags = ordered + remaining
         result["split_types"] = all_tags
 
-        # 3. 清洗 + 保护 + 拆分
+        # 2. 清洗 + 保护 + 拆分
         cleaned_text = clean_html(raw_text)
         cleaned_text, prot_blocks = _apply_protection(cleaned_text)
 
         if "纯文本段落拆分" in all_tags:
-            # 纯文本走独立段落拆分
             paragraphs = split_plain_by_paragraphs(cleaned_text)
             gdata = []
             for idx, content in enumerate(paragraphs, start=1):
@@ -176,9 +172,9 @@ def process_single_law(law_id, conn, quiet=True):
             other_types = [t for t in all_tags if t != "纯文本段落拆分"]
             if other_types:
                 gdata = split_single_group_with_rollback(
-                    gdata, law_id, split_types_override=other_types, verbose=False)
+                    gdata, law_id, split_types_override=other_types, verbose=False,
+                    score_collector=score_collector)
         elif all_tags and all_tags != ["纯文本"]:
-            # 有拆分类型：创建初始 group_data，传入 split_types_override
             gdata = [{
                 "group": law_id,
                 "seq": 1,
@@ -188,9 +184,9 @@ def process_single_law(law_id, conn, quiet=True):
                 "split_type": None,
             }]
             gdata = split_single_group_with_rollback(
-                gdata, law_id, split_types_override=all_tags, verbose=False)
+                gdata, law_id, split_types_override=all_tags, verbose=False,
+                score_collector=score_collector)
         else:
-            # 纯文本（不分拆）：整个文本作为一行输出
             gdata = [{
                 "group": law_id,
                 "seq": 1,
@@ -200,11 +196,11 @@ def process_single_law(law_id, conn, quiet=True):
                 "split_type": None,
             }]
 
-        # 4. 还原保护块占位符
+        # 3. 还原保护块占位符
         for frag in gdata:
             frag["content"] = _restore_placeholders(frag["content"], prot_blocks)
 
-        # 5. 差分权重法：推断类型索引级别并标记每个片段
+        # 4. 差分权重法：推断类型索引级别并标记每个片段
         type_levels = infer_type_levels(gdata)
         for frag in gdata:
             st = frag.get("split_type")
@@ -219,6 +215,22 @@ def process_single_law(law_id, conn, quiet=True):
         print(f"\n  [FAIL] {law_id} — {type(e).__name__}: {e}", file=_sys.stderr)
 
     return result
+
+
+def process_single_law(law_id, conn, quiet=True):
+    """一条法律的完整流水线：DB拉取 → process_text。"""
+    with conn.cursor() as cursor:
+        raw_text = _fetch_text(cursor, law_id)
+    if not raw_text:
+        return {
+            "law_id": law_id,
+            "analysis": None,
+            "split_types": [],
+            "split_count": 0,
+            "split_results": [],
+            "error": "未获取到文本",
+        }
+    return process_text(raw_text, law_id=law_id, quiet=quiet)
 
 
 # ====================================================================
@@ -479,7 +491,7 @@ def _run_ids(law_ids):
 # ====================================================================
 
 def _run_test():
-    """内置测试：用空白文本走完整流程。"""
+    """内置测试：走完整 process_text 流程。"""
     test_text = """
 
 
@@ -488,30 +500,14 @@ def _run_test():
     print("使用内置测试文本。\n")
     test_law_id = "test-001"
 
-    results = analyze(test_text)
-    analysis_report = print_report(results, test_text, law_id=test_law_id)
-    all_tags = analysis_report.get("all_tags", [])
+    result = process_text(test_text, law_id=test_law_id, quiet=False)
 
-    print(f"\n  最终拆分类型: {all_tags}")
-    print(f"  开始拆分...")
+    if result["error"]:
+        print(f"引擎错误: {result['error']}")
+        return
 
-    cleaned_text = clean_html(test_text)
-
-    if all_tags and all_tags != ["纯文本"]:
-        gdata = [{
-            "group": test_law_id, "seq": 1,
-            "content": cleaned_text, "extra": None,
-            "source_id": 0, "split_type": None,
-        }]
-        gdata = split_single_group_with_rollback(
-            gdata, test_law_id, split_types_override=all_tags)
-    else:
-        gdata = [{
-            "group": test_law_id, "seq": 1,
-            "content": cleaned_text, "extra": None,
-            "source_id": 0, "split_type": None,
-        }]
-
+    gdata = result["split_results"]
+    print(f"\n  最终拆分类型: {result['split_types']}")
     print(f"  拆分完成，共 {len(gdata)} 个片段")
 
     for frag in gdata[:5]:
@@ -520,15 +516,7 @@ def _run_test():
     if len(gdata) > 5:
         print(f"    ... 共 {len(gdata)} 个片段")
 
-    all_results = [{
-        "law_id": test_law_id,
-        "analysis": analysis_report,
-        "split_types": all_tags,
-        "split_count": len(gdata),
-        "split_results": gdata,
-        "error": None,
-    }]
-    _write_excel(all_results, OUTPUT_EXCEL)
+    _write_excel([result], OUTPUT_EXCEL)
     print(f"\n  结果已保存至 {OUTPUT_EXCEL}")
 
 
@@ -550,6 +538,12 @@ if __name__ == "__main__":
         law_ids = _read_law_ids_from_excel(
             LAW_ID_EXCEL_FILE, LAW_ID_EXCEL_SHEET, LAW_ID_EXCEL_COLUMN)
         print(f"从 {LAW_ID_EXCEL_FILE} 读取到 {len(law_ids)} 个 law_id\n")
+        pipeline_run(law_ids)
+
+    elif len(sys.argv) > 2 and sys.argv[1] == "--excel":
+        law_ids = _read_law_ids_from_excel(
+            sys.argv[2], LAW_ID_EXCEL_SHEET, LAW_ID_EXCEL_COLUMN)
+        print(f"从 {sys.argv[2]} 读取到 {len(law_ids)} 个 law_id\n")
         pipeline_run(law_ids)
 
     elif len(sys.argv) > 1 and sys.argv[1] == "--id" and len(sys.argv) > 2:
