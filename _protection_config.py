@@ -128,9 +128,9 @@ TAI_PATTERN = re.compile(
 )
 
 # 数字顿号序列（如 1、2、3、4、5）
-DIGIT_ENUM_PATTERN = re.compile(r'\d+(?:、\d+)+')
+DIGIT_ENUM_PATTERN = re.compile(r'\d+(?:、\s*\d+)+')
 # 中文顿号序列（如 一、二、三、四、五）
-CN_ENUM_PATTERN = re.compile(r'[一二三四五六七八九十]+(?:、[一二三四五六七八九十]+)+')
+CN_ENUM_PATTERN = re.compile(r'[一二三四五六七八九十]+(?:、\s*[一二三四五六七八九十]+)+')
 # 第一、第二、第三、第 等带第前缀的完整/不完整中文序列
 DI_ENUM_PATTERN = re.compile(r'第[一二三四五六七八九十]+(?:、第[一二三四五六七八九十]+)*、第')
 # x级（如 1级、2级）
