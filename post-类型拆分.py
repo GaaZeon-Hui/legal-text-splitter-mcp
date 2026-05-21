@@ -1061,148 +1061,6 @@ def process_raw_text_to_single_row(raw_text, law_id):
     }]
 
 # ===== 主流程 =====
-def parse_and_reorder(text, split_type="条"):
-    """全局排序纠错：对纯文本做全文匹配 → 切段 → 建连续性堆 → 递增组链接 → 游离堆回卷。"""
-    tp_entry = None
-    for name, pat, func in type_patterns:
-        if name == split_type:
-            tp_entry = (pat, func)
-            break
-    if tp_entry is None:
-        raise ValueError(f"parse_and_reorder: split_type '{split_type}' 不在 type_patterns 中")
-
-    pattern, ord_func = tp_entry
-
-    matches = list(pattern.finditer(text))
-    if not matches:
-        return []
-
-    records = []
-    for idx, m in enumerate(matches, start=1):
-        article_no = ord_func(m)
-        if not isinstance(article_no, int):
-            raise ValueError(
-                f"parse_and_reorder 仅支持 scalar 序数类型（int），"
-                f"split_type='{split_type}' 返回了 {type(article_no).__name__}: {article_no}"
-            )
-        records.append({"order": idx, "article_no": article_no, "segment_idx": None})
-
-    if not records:
-        return []
-
-    starts = [m.start() for m in matches]
-    paragraphs = [text[:starts[0]]]
-    for i in range(len(matches)):
-        start = starts[i]
-        end = starts[i + 1] if i < len(matches) - 1 else len(text)
-        paragraphs.append(text[start:end])
-
-    for i, rec in enumerate(records, start=1):
-        rec["segment_idx"] = i
-
-    heaps = []
-    current = None
-    for rec in records:
-        if current is None:
-            current = {
-                "heap_no": None,
-                "entries": [rec],
-                "start_article": rec["article_no"],
-                "end_article": rec["article_no"],
-            }
-        elif rec["article_no"] == current["entries"][-1]["article_no"] + 1:
-            current["entries"].append(rec)
-            current["end_article"] = rec["article_no"]
-        else:
-            heaps.append(current)
-            current = {
-                "heap_no": None,
-                "entries": [rec],
-                "start_article": rec["article_no"],
-                "end_article": rec["article_no"],
-            }
-    if current:
-        heaps.append(current)
-
-    for i, h in enumerate(heaps, start=1):
-        h["heap_no"] = i
-    heap_map = {h["heap_no"]: h for h in heaps}
-
-    unassigned = {h["heap_no"] for h in heaps}
-    inc_groups = []
-    group_no = 0
-    search_start = 1
-    while search_start in unassigned or any(h_no >= search_start for h_no in unassigned):
-        candidates = [h_no for h_no in unassigned if h_no >= search_start]
-        if not candidates:
-            break
-        start_h_no = min(candidates)
-        cur_h = heap_map[start_h_no]
-        group = [cur_h]
-        unassigned.remove(start_h_no)
-
-        while True:
-            next_h_no = None
-            for h_no in sorted(unassigned):
-                if heap_map[h_no]["start_article"] == cur_h["end_article"] + 1:
-                    next_h_no = h_no
-                    break
-            if next_h_no is None:
-                break
-            next_h = heap_map[next_h_no]
-            unassigned.remove(next_h_no)
-            group.append(next_h)
-            cur_h = next_h
-
-        group_no += 1
-        inc_groups.append({"group_no": group_no, "heaps": group})
-        search_start = group[-1]["heap_no"] + 1
-
-    tag_r = set()
-    for group_info in inc_groups:
-        heaps_in_group = group_info["heaps"]
-        start_h = heaps_in_group[0]["heap_no"]
-        end_h = heaps_in_group[-1]["heap_no"]
-        group_set = {h["heap_no"] for h in heaps_in_group}
-        for h_no in range(start_h, end_h + 1):
-            if h_no in heap_map and h_no not in group_set:
-                tag_r.add(h_no)
-
-    for group_info in reversed(inc_groups):
-        first_rec = group_info["heaps"][0]["entries"][0]
-        if first_rec["article_no"] != 1:
-            for h in group_info["heaps"]:
-                tag_r.add(h["heap_no"])
-
-    rollback_list = sorted(tag_r)
-    while rollback_list:
-        h_no = rollback_list.pop()
-        target = heap_map[h_no]
-        while target["entries"]:
-            entry = target["entries"].pop()
-            seg = entry["segment_idx"]
-            if seg > 0:
-                paragraphs[seg - 1] += paragraphs[seg]
-                paragraphs[seg] = ""
-        target["start_article"] = None
-        target["end_article"] = None
-
-    reordered = []
-    for group_info in inc_groups:
-        for h in group_info["heaps"]:
-            for entry in h["entries"]:
-                seg = entry["segment_idx"]
-                content = paragraphs[seg]
-                if content:
-                    reordered.append(content)
-
-    prefix = paragraphs[0].strip() if paragraphs and paragraphs[0] else ""
-    if prefix:
-        reordered.insert(0, paragraphs[0])
-
-    return reordered
-
-
 def main():
     wb = openpyxl.load_workbook(INPUT_FILE)
     ws = wb[SHEET_NAME]
@@ -1261,18 +1119,12 @@ def main():
                 final_rows.extend(gdata)
                 continue
 
-            reordered = parse_and_reorder(clean_text, DB_PRIMARY_TYPE)
-            if not reordered:
-                reordered = [clean_text]
-
-            gdata = []
-            for idx, content in enumerate(reordered, start=1):
-                gdata.append({
-                    "group": gn, "seq": idx,
-                    "content": content, "extra": None,
-                    "source_id": 0, "split_type": None
-                })
-            print(f"  parse_and_reorder({DB_PRIMARY_TYPE}) → {len(gdata)} 段")
+            gdata = [{
+                "group": gn, "seq": 1,
+                "content": clean_text, "extra": None,
+                "source_id": 0, "split_type": None
+            }]
+            print(f"  整文入口 → {len(gdata)} 段")
 
             secondary = DB_SECONDARY_TYPES
             if secondary is None:
