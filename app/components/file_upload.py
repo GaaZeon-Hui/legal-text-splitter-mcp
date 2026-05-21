@@ -164,14 +164,14 @@ async def _show_column_dialog(headers: list[str]) -> int | None:
         ui.label('选择要读取的文本列').classes('text-lg font-bold')
         ui.label(f'检测到 {len(headers)} 列').classes('text-sm text-grey')
 
-        options = {f'{h} (第{i+1}列)': i
+        options = {i: f'{h} (第{i+1}列)'
                    for i, h in enumerate(headers) if h}
         if not options:
-            options = {f'第{i+1}列': i for i in range(len(headers))}
+            options = {i: f'第{i+1}列' for i in range(len(headers))}
 
         col_select = ui.select(
             options=options,
-            value=list(options.values())[0],
+            value=list(options.keys())[0],
             label='文本列',
         ).classes('w-full')
 
