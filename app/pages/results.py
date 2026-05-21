@@ -30,7 +30,7 @@ def build():
             ui.label(f'类型: {", ".join(meta.get("all_tags", [])) or "-"}').classes('text-sm')
             ui.label(f'层级: {meta.get("level_chain", "-")}').classes('text-sm')
             ui.label(f'耗时: {meta.get("processing_ms", 0)}ms').classes('text-sm')
-            ui.label(f'算法: {meta.get("algorithm", "-")}').classes('text-sm')
+
 
         if fragments:
             _build_pretext_table(fragments)

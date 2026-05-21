@@ -20,15 +20,12 @@ class ServiceClient:
         except Exception:
             return False
 
-    async def split(self, text: str, params: dict | None = None) -> dict:
+    async def split(self, text: str) -> dict:
         """Send text to /api/split, return parsed JSON response.
 
         Raises ServiceError on non-200 response or network failure.
         """
-        body = {
-            'text': text,
-            'params': params or {},
-        }
+        body = {'text': text}
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             r = await client.post(
                 f'{self.base_url}/api/split',
@@ -36,6 +33,26 @@ class ServiceClient:
             )
         if r.status_code == 422:
             detail = r.json().get('detail', '文本无法解析')
+            raise ServiceError(detail, status_code=422)
+        if r.status_code != 200:
+            raise ServiceError(
+                f'服务返回错误 ({r.status_code})',
+                status_code=r.status_code)
+        return r.json()
+
+    async def split_by_ids(self, law_ids: list[str]) -> dict:
+        """Send law_id list to /api/split-by-ids, return parsed JSON response.
+
+        Raises ServiceError on non-200 response or network failure.
+        """
+        body = {'law_ids': law_ids}
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            r = await client.post(
+                f'{self.base_url}/api/split-by-ids',
+                json=body,
+            )
+        if r.status_code == 422:
+            detail = r.json().get('detail', '请求无效')
             raise ServiceError(detail, status_code=422)
         if r.status_code != 200:
             raise ServiceError(

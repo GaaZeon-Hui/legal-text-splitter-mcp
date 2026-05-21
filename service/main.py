@@ -1,8 +1,9 @@
 """FastAPI service for legal document splitting.
 
 Endpoints:
-    GET  /health     — health check
-    POST /api/split  — analyze + split legal text
+    GET  /health          — health check
+    POST /api/split        — split raw text
+    POST /api/split-by-ids — split by law_id list (DB lookup)
 """
 import asyncio
 import os
@@ -15,9 +16,10 @@ if _PARENT not in sys.path:
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from service.split_service import split_text as _split_text
+from service.split_service import split_by_ids as _split_by_ids
 
 app = FastAPI(title='法规文本拆分服务', version='1.0.0')
 
@@ -31,15 +33,8 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
-class SplitParams(BaseModel):
-    algorithm: str = 'scored'
-    split_types: list[str] | None = None
-    min_fragment_chars: int = 10
-
-
 class SplitRequest(BaseModel):
     text: str
-    params: SplitParams = Field(default_factory=SplitParams)
 
 
 @app.get('/health')
@@ -53,8 +48,26 @@ async def api_split(request: SplitRequest):
         raise HTTPException(status_code=422, detail='文本为空或无法解析')
 
     try:
-        result = await asyncio.to_thread(
-            _split_text, request.text, request.params.model_dump())
+        result = await asyncio.to_thread(_split_text, request.text)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'处理失败: {e}')
+
+    return result
+
+
+class SplitByIdsRequest(BaseModel):
+    law_ids: list[str]
+
+
+@app.post('/api/split-by-ids')
+async def api_split_by_ids(request: SplitByIdsRequest):
+    if not request.law_ids:
+        raise HTTPException(status_code=422, detail='law_ids 为空')
+
+    try:
+        result = await asyncio.to_thread(_split_by_ids, request.law_ids)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

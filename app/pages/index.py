@@ -26,21 +26,16 @@ def build():
             current_text = text
             _split_btn.enabled = bool(text.strip()) and service_online
 
-        uploader = FileUpload(on_text_changed=on_text_change)
+        current_law_ids = []
 
-        # -- Parameters (collapsible) --
-        with ui.expansion('算法参数', icon='tune').classes('w-full'):
-            algorithm_select = ui.select(
-                options={'scored': 'scored (打分式)', 'legacy': 'legacy (规则式)'},
-                value='scored',
-                label='算法',
-            ).classes('w-48')
+        def on_law_ids_changed(law_ids):
+            nonlocal current_law_ids
+            current_law_ids = law_ids
+            _split_btn.enabled = bool(law_ids) and service_online
+            _split_btn.props('label=批量拆分')
 
-            split_types_select = ui.select(
-                options={'auto': '自动检测'},
-                value='auto',
-                label='拆分类型',
-            ).classes('w-48')
+        uploader = FileUpload(on_text_changed=on_text_change,
+                              on_law_ids_changed=on_law_ids_changed)
 
         # -- Split button --
         with ui.row().classes('items-center gap-4'):
@@ -82,22 +77,21 @@ def build():
                 _do_split()
 
     async def _do_split():
-        nonlocal current_text
+        nonlocal current_text, current_law_ids
         text = current_text.strip()
-        if not text:
+        law_ids = current_law_ids
+
+        if not text and not law_ids:
             return
 
         _split_btn.visible = False
         _spinner.classes(remove='hidden')
 
         try:
-            params = {
-                'algorithm': algorithm_select.value,
-            }
-            if split_types_select.value != 'auto':
-                params['split_types'] = [t.strip() for t in split_types_select.value.split(',')]
-
-            result = await svc.split(text, params)
+            if law_ids:
+                result = await svc.split_by_ids(law_ids)
+            else:
+                result = await svc.split(text)
             app.storage.user['last_result'] = result
             app.storage.user['last_text'] = text
             ui.navigate.to('/results')

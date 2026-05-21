@@ -62,6 +62,21 @@ def _parse_xlsx_column(raw: bytes, col_index: int) -> str:
     return '\n'.join(cells)
 
 
+def _parse_xlsx_law_ids(raw: bytes, col_index: int) -> list[str]:
+    """Extract law_id list from a single column in the Excel file."""
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True)
+    ws = wb.active
+    law_ids = []
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=col_index + 1,
+                            max_col=col_index + 1, values_only=True):
+        val = row[0]
+        if val is not None and str(val).strip():
+            law_ids.append(str(val).strip())
+    wb.close()
+    return law_ids
+
+
 class FileUpload:
     """Upload area + Excel column selector + shared textarea.
 
@@ -70,8 +85,9 @@ class FileUpload:
         # uploader.textarea is the shared ui.textarea
     """
 
-    def __init__(self, on_text_changed=None):
+    def __init__(self, on_text_changed=None, on_law_ids_changed=None):
         self.on_text_changed = on_text_changed
+        self.on_law_ids_changed = on_law_ids_changed
 
         with ui.column().classes('w-full gap-2'):
             # Upload area
@@ -113,20 +129,27 @@ class FileUpload:
                 parsed = _parse_docx(raw)
 
             elif ext.endswith('.xlsx'):
-                # Detect headers and ask user to pick column
+                # Detect headers and ask user to pick law_id column
                 headers = _parse_xlsx_headers(raw)
                 if not headers:
                     ui.notify('Excel 文件第一行为空，无法读取列', type='negative')
                     self.upload.reset()
                     return
 
-                # Show column selection dialog
-                col_index = await _show_column_dialog(headers)
+                col_index = await _show_column_dialog(headers, title='选择 law_id 列')
                 if col_index is None:
-                    # User cancelled — keep current text, do nothing
                     self.upload.reset()
                     return
-                parsed = _parse_xlsx_column(raw, col_index)
+                law_ids = _parse_xlsx_law_ids(raw, col_index)
+                if not law_ids:
+                    ui.notify('law_id 列为空', type='warning')
+                    self.upload.reset()
+                    return
+
+                if self.on_law_ids_changed:
+                    self.on_law_ids_changed(law_ids)
+                self.upload.reset()
+                return
 
             else:
                 ui.notify(f'不支持的格式: {ext}', type='negative')
@@ -156,12 +179,12 @@ class FileUpload:
         self.upload.reset()
 
 
-async def _show_column_dialog(headers: list[str]) -> int | None:
+async def _show_column_dialog(headers: list[str], title: str = '选择要读取的文本列') -> int | None:
     """Show dialog for column selection. Returns column index or None if cancelled."""
     result = {'index': None}
 
     with ui.dialog() as dialog, ui.card().classes('p-4'):
-        ui.label('选择要读取的文本列').classes('text-lg font-bold')
+        ui.label(title).classes('text-lg font-bold')
         ui.label(f'检测到 {len(headers)} 列').classes('text-sm text-grey')
 
         options = {i: f'{h} (第{i+1}列)'
