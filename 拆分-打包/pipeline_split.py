@@ -541,6 +541,12 @@ if __name__ == "__main__":
         print(f"从 {LAW_ID_EXCEL_FILE} 读取到 {len(law_ids)} 个 law_id\n")
         pipeline_run(law_ids)
 
+    elif len(sys.argv) > 2 and sys.argv[1] == "--excel":
+        law_ids = _read_law_ids_from_excel(
+            sys.argv[2], LAW_ID_EXCEL_SHEET, LAW_ID_EXCEL_COLUMN)
+        print(f"从 {sys.argv[2]} 读取到 {len(law_ids)} 个 law_id\n")
+        pipeline_run(law_ids)
+
     elif len(sys.argv) > 1 and sys.argv[1] == "--id" and len(sys.argv) > 2:
         _run_single(sys.argv[2])
 
