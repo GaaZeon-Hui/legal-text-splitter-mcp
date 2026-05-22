@@ -4,7 +4,7 @@ Starts the FastAPI service, waits for it to be ready, then launches
 the NiceGUI UI. Both processes are cleaned up on exit.
 
 Usage:
-    python launch.py        # prints progress, opens browser
+    python launch.py              # prints progress, opens browser
     python launch.py --no-browser  # don't open browser automatically
 """
 import subprocess
@@ -12,6 +12,7 @@ import sys
 import os
 import time
 import signal
+import atexit
 
 _PARENT = os.path.dirname(os.path.abspath(__file__))
 SERVICE_HOST = '127.0.0.1'
@@ -21,6 +22,41 @@ HEALTH_URL = f'http://{SERVICE_HOST}:{SERVICE_PORT}/health'
 SERVICE_STARTUP_TIMEOUT = 15  # seconds
 
 _service_proc = None
+_IS_WINDOWS = sys.platform == 'win32'
+_CREATION_FLAGS = subprocess.CREATE_NO_WINDOW if _IS_WINDOWS else 0
+
+
+def _kill_port_owner(port):
+    """Kill the process occupying the given port, if any."""
+    if not _IS_WINDOWS:
+        import shlex
+        try:
+            result = subprocess.run(
+                ['lsof', '-ti', f':{port}'], capture_output=True, text=True)
+            pids = result.stdout.strip().split()
+            for pid in pids:
+                os.kill(int(pid), signal.SIGKILL)
+        except Exception:
+            pass
+        return
+
+    try:
+        output = subprocess.check_output(
+            ['netstat', '-ano'], text=True, creationflags=_CREATION_FLAGS)
+    except Exception:
+        return
+    for line in output.split('\n'):
+        if f':{port}' not in line or 'LISTENING' not in line:
+            continue
+        parts = line.strip().split()
+        if not parts:
+            continue
+        pid = parts[-1]
+        try:
+            subprocess.run(['taskkill', '/F', '/PID', pid],
+                           capture_output=True, creationflags=_CREATION_FLAGS)
+        except Exception:
+            pass
 
 
 def _start_service():
@@ -33,6 +69,7 @@ def _start_service():
         cwd=_PARENT,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        creationflags=_CREATION_FLAGS,
     )
     print(f'启动分析服务 (pid={_service_proc.pid})...', end='', flush=True)
 
@@ -75,7 +112,7 @@ def _stop_service():
 
 
 def _cleanup():
-    """Cleanup handler — called on normal exit and SIGINT."""
+    """Cleanup handler — called on normal exit, SIGINT, SIGTERM, SIGBREAK."""
     _stop_service()
 
 
@@ -86,6 +123,10 @@ def main():
     print('  法规文本拆分系统')
     print('=' * 50)
 
+    # 0. Kill stale processes on our ports
+    _kill_port_owner(SERVICE_PORT)
+    _kill_port_owner(UI_PORT)
+
     # 1. Start service
     _start_service()
 
@@ -95,9 +136,12 @@ def main():
         _stop_service()
         sys.exit(1)
 
-    # 3. Register cleanup
+    # 3. Register cleanup — dual path: atexit + signals
+    atexit.register(_cleanup)
     signal.signal(signal.SIGINT, lambda sig, frame: (_cleanup(), sys.exit(0)))
     signal.signal(signal.SIGTERM, lambda sig, frame: (_cleanup(), sys.exit(0)))
+    if _IS_WINDOWS:
+        signal.signal(signal.SIGBREAK, lambda sig, frame: (_cleanup(), sys.exit(0)))
 
     # 4. Suppress browser if requested
     if not show_browser:
