@@ -14,7 +14,7 @@
 ### 从 Git 安装（推荐）
 
 ```bash
-git clone <仓库地址>
+git clone <https://github.com/GaaZeon-Hui/legal-text-splitter-mcp.git>
 cd legal-text-splitter-mcp
 pip install -e .
 ```
