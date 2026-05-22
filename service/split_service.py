@@ -63,6 +63,7 @@ def split_text(text: str) -> dict:
             'split_type': frag.get('split_type'),
             'index_level': frag.get('index_level'),
             'ordinal': get_ordinal(frag.get('content', '')),
+            'extra': frag.get('extra', ''),
         })
 
     # Build meta from analysis report
@@ -119,6 +120,7 @@ def split_by_ids(law_ids: list[str]) -> dict:
                     'split_type': frag.get('split_type'),
                     'index_level': frag.get('index_level'),
                     'ordinal': get_ordinal(frag.get('content', '')),
+                    'extra': frag.get('extra', ''),
                 })
 
             level_chain = '-'

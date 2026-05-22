@@ -178,7 +178,7 @@ def _build_batch_excel(batch_result: dict) -> bytes:
             ws_s.cell(row=row_s, column=1, value=lid)
             ws_s.cell(row=row_s, column=2, value=frag.get('seq', ''))
             ws_s.cell(row=row_s, column=3, value=frag.get('content', ''))
-            ws_s.cell(row=row_s, column=4, value='')
+            ws_s.cell(row=row_s, column=4, value=frag.get('extra', ''))
             il = frag.get('index_level')
             ws_s.cell(row=row_s, column=5, value=il if il is not None else '')
             row_s += 1
