@@ -188,4 +188,5 @@ print(f'{len(result[\"split_results\"])} 个片段')
 
 ## 许可
 
-MIT
+## License
+MIT License. See [LICENSE](LICENSE) file for details.
