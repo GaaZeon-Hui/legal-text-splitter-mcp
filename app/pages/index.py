@@ -65,7 +65,7 @@ def build():
             _status_dot.classes(remove='bg-green')
             _status_dot.classes(add='bg-red')
             _status_label.set_text('服务断开')
-        _split_btn.enabled = bool(current_text.strip()) and service_online
+        _split_btn.enabled = bool(current_text.strip() or current_law_ids) and service_online
 
     ui.timer(5.0, _check_health)
 
@@ -89,12 +89,20 @@ def build():
 
         try:
             if law_ids:
-                result = await svc.split_by_ids(law_ids)
+                batch_result = await svc.split_by_ids(law_ids)
+                from datetime import datetime
+                default_name = datetime.now().strftime('%m%d%H%M')
+                filename = await _ask_filename(default_name)
+                if filename is None:
+                    return
+                excel_bytes = _build_batch_excel(batch_result)
+                ui.download(excel_bytes, f'{filename}.xlsx')
+                ui.notify(f'已导出 {len(batch_result["results"])} 条结果', type='positive')
             else:
                 result = await svc.split(text)
-            app.storage.user['last_result'] = result
-            app.storage.user['last_text'] = text
-            ui.navigate.to('/results')
+                app.storage.user['last_result'] = result
+                app.storage.user['last_text'] = text
+                ui.navigate.to('/results')
 
         except ServiceError as e:
             ui.notify(str(e), type='negative')
@@ -103,3 +111,79 @@ def build():
         finally:
             _split_btn.visible = True
             _spinner.classes('hidden', add=True)
+
+
+async def _ask_filename(default_name: str) -> str | None:
+    """Show dialog asking for Excel filename."""
+    result = {'name': None}
+
+    with ui.dialog() as dialog, ui.card().classes('p-4'):
+        ui.label('保存 Excel 文件').classes('text-lg font-bold')
+        name_input = ui.input('文件名', value=default_name).classes('w-full')
+        with ui.row().classes('gap-2 mt-2'):
+            ui.button('确定', on_click=lambda: _set_and_close(name_input.value))
+            ui.button('取消', on_click=lambda: dialog.close())
+
+        def _set_and_close(val):
+            result['name'] = val
+            dialog.close()
+
+    await dialog
+    return result['name']
+
+
+def _build_batch_excel(batch_result: dict) -> bytes:
+    """Build Excel from batch results, matching engine _write_excel format."""
+    import io
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+
+    ws_a = wb.active
+    ws_a.title = '拆分类型分析'
+    a_headers = ['law_id', '文本长度', '脊椎类型', '脊椎maxN',
+                 '附生类型', '附生组数', '全部标签', '最终拆分类型',
+                 '拆分片段数', '字符数', '段落数', '错误信息']
+    for col, h in enumerate(a_headers, start=1):
+        ws_a.cell(row=1, column=col, value=h)
+
+    ws_s = wb.create_sheet('拆分结果')
+    s_headers = ['组', '序号', '内容', '保留列', '索引级别']
+    for col, h in enumerate(s_headers, start=1):
+        ws_s.cell(row=1, column=col, value=h)
+
+    row_a = 2
+    row_s = 2
+    for r in batch_result['results']:
+        lid = r['law_id']
+        a = r.get('analysis') or {}
+        meta = r.get('meta') or {}
+        error = r.get('error', '')
+
+        ws_a.cell(row=row_a, column=1, value=lid)
+        ws_a.cell(row=row_a, column=2, value=a.get('char_count', 0))
+        ws_a.cell(row=row_a, column=3, value=', '.join(a.get('spine_types', [])))
+        ws_a.cell(row=row_a, column=4, value=a.get('max_n', 0))
+        ws_a.cell(row=row_a, column=5, value=', '.join(a.get('satellite_types', [])))
+        ws_a.cell(row=row_a, column=6, value=a.get('max_gc', 0))
+        ws_a.cell(row=row_a, column=7, value=', '.join(a.get('all_tags', [])))
+        ws_a.cell(row=row_a, column=8, value=', '.join(meta.get('all_tags', [])))
+        ws_a.cell(row=row_a, column=9, value=meta.get('fragment_count', 0))
+        ws_a.cell(row=row_a, column=10, value=a.get('char_count', 0))
+        ws_a.cell(row=row_a, column=11, value=a.get('para_count', 0))
+        ws_a.cell(row=row_a, column=12, value=error)
+        row_a += 1
+
+        for frag in r.get('fragments', []):
+            ws_s.cell(row=row_s, column=1, value=lid)
+            ws_s.cell(row=row_s, column=2, value=frag.get('seq', ''))
+            ws_s.cell(row=row_s, column=3, value=frag.get('content', ''))
+            ws_s.cell(row=row_s, column=4, value='')
+            il = frag.get('index_level')
+            ws_s.cell(row=row_s, column=5, value=il if il is not None else '')
+            row_s += 1
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.read()

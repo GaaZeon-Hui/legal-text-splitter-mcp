@@ -103,6 +103,7 @@ def split_by_ids(law_ids: list[str]) -> dict:
                     'law_id': law_id,
                     'fragments': [],
                     'meta': {},
+                    'analysis': {},
                     'error': engine_result['error'],
                 })
                 continue
@@ -129,6 +130,7 @@ def split_by_ids(law_ids: list[str]) -> dict:
             results.append({
                 'law_id': law_id,
                 'fragments': fragments,
+                'analysis': analysis,
                 'meta': {
                     'char_count': analysis.get('char_count', 0),
                     'fragment_count': len(fragments),
