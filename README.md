@@ -11,7 +11,7 @@
 
 ## 安装
 
-### 方式 1：从 Git 安装（推荐）
+### 从 Git 安装（推荐）
 
 ```bash
 git clone <仓库地址>
@@ -19,20 +19,7 @@ cd legal-text-splitter-mcp
 pip install -e .
 ```
 
-### 方式 2：从本地 wheel 安装
 
-```bash
-pip install dist/legal_text_splitter_mcp-0.1.0-py3-none-any.whl
-```
-
-
-### 构建 wheel
-
-```bash
-pip install build
-python -m build
-# 产物在 dist/ 目录下
-```
 
 ## 配置 MCP 客户端
 
