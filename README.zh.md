@@ -25,13 +25,6 @@ pip install -e .
 pip install dist/legal_text_splitter_mcp-0.1.0-py3-none-any.whl
 ```
 
-### 方式 3：从 PyPI 安装（发布后）
-
-```bash
-pip install legal-text-splitter-mcp
-# 或直接运行
-uvx legal-text-splitter-mcp
-```
 
 ### 构建 wheel
 
@@ -74,7 +67,7 @@ python -m build
 
 ### 从本地路径安装时
 
-如果尚未发布到 PyPI，使用本地路径：
+使用本地路径：
 
 ```json
 {
