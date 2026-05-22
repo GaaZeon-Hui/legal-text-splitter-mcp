@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "legal-text-splitter-mcp"
+version = "0.1.0"
+description = "MCP server for Chinese legal text splitting"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "mcp>=1.0.0",
+    "openpyxl",
+    "pymysql",
+]
+
+[project.scripts]
+legal-text-splitter-mcp = "legal_text_splitter.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
