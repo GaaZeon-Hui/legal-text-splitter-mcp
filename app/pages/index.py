@@ -59,11 +59,11 @@ def build():
         service_online = await svc.health()
         if service_online:
             _status_dot.classes(remove='bg-red')
-            _status_dot.classes(add='bg-green')
+            _status_dot.classes('bg-green')
             _status_label.set_text('服务已连接')
         else:
             _status_dot.classes(remove='bg-green')
-            _status_dot.classes(add='bg-red')
+            _status_dot.classes('bg-red')
             _status_label.set_text('服务断开')
         _split_btn.enabled = bool(current_text.strip() or current_law_ids) and service_online
 
@@ -110,7 +110,7 @@ def build():
             ui.notify(f'请求失败: {e}', type='negative')
         finally:
             _split_btn.visible = True
-            _spinner.classes('hidden', add=True)
+            _spinner.classes('hidden')
 
 
 async def _ask_filename(default_name: str) -> str | None:
