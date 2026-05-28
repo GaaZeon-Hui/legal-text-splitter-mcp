@@ -152,9 +152,9 @@ DU_PATTERN = re.compile(r'(?<!\d)\d+(?:\.\d+)?\s*度')
 # x份/件/箱/块/位（如 1份、2件、3箱、4块、5位）
 UNIT2_PATTERN = re.compile(r'(?<!\d)\d+\s*[份件箱块位]')
 # 条件x / 条件：x（如 条件1、条件：2）
-CONDITION_PATTERN = re.compile(r'条件[：:]?\s*\d+')
+CONDITION_PATTERN = re.compile(r'条件[：:]?\s*\d+(?!\.)')
 # 说明x（如 说明1、说明2）
-DESCRIPTION_PATTERN = re.compile(r'说明\s*\d+')
+DESCRIPTION_PATTERN = re.compile(r'说明\d+(?!\.)')
 # （中文数字）、序列如 （一）、（二）、（三）、
 BRACKET_ENUM_PATTERN = re.compile(r'[（(][一二三四五六七八九十]+[）)](?:、[（(][一二三四五六七八九十]+[）)])+、?')
 # x张（如 1张、2张）
@@ -182,7 +182,7 @@ WEIYI_PATTERN = re.compile(r'唯\s*一')
 # 科目x（如 科目一、科目二、科目1）
 KEMU_PATTERN = re.compile(r'科目[一二三四五六七八九十\d]+')
 # 罗马数字（全角 ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ）
-ROMAN_PATTERN = re.compile(r'(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]+|(?<![A-Za-z])[IVXLCDM]+(?![A-Za-z]))')
+ROMAN_PATTERN = re.compile(r'(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]+|(?<![A-Za-z_])[IVXLCDM]+(?![A-Za-z_]))')
 # 第x列
 LIE_PATTERN = re.compile(r'第\s*\d+\s*列')
 # 第x款
@@ -201,15 +201,25 @@ TAO_PATTERN = re.compile(r'(?<!\d)\d+\s*套')
 PIAN_PATTERN = re.compile(r'(?<!\d)\d+\s*篇')
 TRRILION_PATTERN = re.compile(r'(?<!\d)\d+\s*亿元')
 ZI_PATTERN = re.compile(r'(?<!\d)\d+\s*字')
+LEI_PATTERN = re.compile(r'(?<!\d)\d+\s*类(?!别|型|似|比)')
+MOKUAI_PATTERN = re.compile(r'(?<!\d)\d+\s*模块')
 def apply_protection_blocks(text):
     """在分析前替换非结构性内容为占位符。返回 (protected_text, blocks)。"""
     blocks = []
 
 
 
+    def _mokuai_repl(m):
+        blocks.append(m.group(0))
+        return f"___PB_MOKUAI_{len(blocks)}___"
+    text = MOKUAI_PATTERN.sub(_mokuai_repl, text)
+    def _lei_repl(m):
+        blocks.append(m.group(0))
+        return f"___PB_LEI_{len(blocks)}___"
+    text = LEI_PATTERN.sub(_lei_repl, text)
     def _zi_repl(m):
         blocks.append(m.group(0))
-        return f"___PB_TRRILION_{len(blocks)}___"
+        return f"___PB_ZI_{len(blocks)}___"
     text = ZI_PATTERN.sub(_zi_repl, text)
     def _trrilion_repl(m):
         blocks.append(m.group(0))
@@ -660,5 +670,5 @@ def _restore_placeholders(text, blocks):
         idx = int(m.group(1)) - 1
         return blocks[idx] if 0 <= idx < len(blocks) else m.group(0)
     text = text.replace('龘', '')
-    text = re.sub(r'___PB_\w+_(\d+)___', _repl, text)
+    text = re.sub(r'___PB_[A-Z0-9]+_(\d+)___', _repl, text)
     return text
