@@ -25,8 +25,9 @@ from _type_patterns_config import build_type_patterns, iter_matches
 
 # ---- 全部拆分类型 ----
 SPLIT_TYPES = [
-    "条", "章", "节", "编", "部分",
-    "括号", "中文顿号", "数字顿号", "数字空格",
+    "条", "章", "节", "编", "部分", "数字部分",
+    "要", "篇",
+    "括号", "括号数字", "中文顿号", "数字顿号",
     "数字条", "数字章", "数字节",
     "数字点", "数字点点", "数字直连中文",
     "文书类型",
@@ -313,7 +314,7 @@ def analyze(text):
     if dunhao_entry and dunhao_entry["count"] > 0:
         dh_positions = dunhao_entry.get("positions", [])
         if dh_positions:
-            PARENT_ORDER = ["中文顿号", "条", "括号", "数字点", "数字点点"]
+            PARENT_ORDER = ["中文顿号", "条", "括号", "括号数字", "数字点", "数字点点"]
             for parent_name in PARENT_ORDER:
                 parent_entry = results.get(parent_name)
                 if not parent_entry or parent_entry["count"] < 2:
@@ -352,7 +353,7 @@ def analyze(text):
     if tiao_entry and tiao_entry["count"] > 0 and tiao_entry["max_n"] <= 4:
         tiao_positions_list = tiao_entry.get("positions", [])
         if tiao_positions_list:
-            PARENT_ORDER_TIAO = ["中文顿号", "括号", "数字点", "数字点点"]
+            PARENT_ORDER_TIAO = ["中文顿号", "括号", "括号数字", "数字点", "数字点点"]
             for parent_name in PARENT_ORDER_TIAO:
                 parent_entry = results.get(parent_name)
                 if not parent_entry or parent_entry["count"] < 2:
@@ -764,30 +765,32 @@ def print_report(results, text="", law_id=None, quiet=False):
 
     # ---- 括号碎片化抑制 ----
     # 括号组数远多于参考类型(>=3x)且每组很短(<=4) → 括号只是子列表/局部碎片
-    # 参考优先级：中文顿号 > 条 > 数字条
+    # 参考优先级：中文顿号 > 条 > 数字条。括号与括号数字共用此逻辑。
     suppressed_override = []
     _BRACKET_REF_TYPES = ["中文顿号", "条", "数字条"]
-    if "括号" in all_tags:
-        kuo_gc = results["括号"]["group_count"]
-        kuo_mn = results["括号"]["max_n"]
-        for ref_type in _BRACKET_REF_TYPES:
-            if ref_type not in all_tags:
-                continue
-            ref_gc = results[ref_type]["group_count"]
-            if ref_gc > 0 and kuo_gc >= ref_gc * 3 and kuo_mn <= 4:
-                all_tags.remove("括号")
-                suppressed_override.append("括号")
-                break
+    for _bt in ("括号", "括号数字"):
+        if _bt in all_tags:
+            kuo_gc = results[_bt]["group_count"]
+            kuo_mn = results[_bt]["max_n"]
+            for ref_type in _BRACKET_REF_TYPES:
+                if ref_type not in all_tags:
+                    continue
+                ref_gc = results[ref_type]["group_count"]
+                if ref_gc > 0 and kuo_gc >= ref_gc * 3 and kuo_mn <= 4:
+                    all_tags.remove(_bt)
+                    suppressed_override.append(_bt)
+                    break
 
     # ---- 括号回退推荐位 ----
-    if "括号" in suppressed_override:
-        dot_suppressed = any(
-            results[t].get("suppressed", False) and results[t].get("suppress_reason") == "条内抑制"
-            for t in ["数字点", "数字点点"]
-        )
-        if dot_suppressed:
-            all_tags = sorted(set(all_tags) | {"括号"})
-            suppressed_override.remove("括号")
+    for _bt in ("括号", "括号数字"):
+        if _bt in suppressed_override:
+            dot_suppressed = any(
+                results[t].get("suppressed", False) and results[t].get("suppress_reason") == "条内抑制"
+                for t in ["数字点", "数字点点"]
+            )
+            if dot_suppressed:
+                all_tags = sorted(set(all_tags) | {_bt})
+                suppressed_override.remove(_bt)
 
     # ---- 枚举型强制推荐 ----
     # 一是/第一部分/要素数字冒号 等枚举标记，max_n>=3 即推荐（放宽 gc 门槛）

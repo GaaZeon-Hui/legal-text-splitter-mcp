@@ -186,15 +186,27 @@ def _build_type_patterns_cached(types_tuple):
 
             results.append(_cn_pat("第{cn}部分", "部分"))
 
+        elif t == "数字部分":
+
+            results.append(_digit_pat(r"第(\d+)部分", "数字部分"))
+
+        elif t == "要":
+
+            results.append(_cn_pat("{cn}要", "要"))
+
+        elif t == "篇":
+
+            results.append(_cn_pat("第{cn}篇", "篇"))
+
         elif t == "括号":
 
-            pat = _LBR + r"[（(](\d+|" + CN_NUM + r")[）)]"
+            pat = _LBR + r"[（(](" + CN_NUM + r")[）)]"
 
-            results.append(("括号", re.compile(pat),
+            results.append(("括号", re.compile(pat), lambda m: cn2int(m.group(1))))
 
-                            lambda m: int(m.group(1)) if m.group(1).isdigit()
+        elif t == "括号数字":
 
-                            else cn2int(m.group(1))))
+            results.append(_digit_pat(r"[（(](\d+)[）)]", "括号数字"))
 
         elif t == "中文顿号":
 
@@ -206,8 +218,6 @@ def _build_type_patterns_cached(types_tuple):
 
             results.append(_digit_pat(r"(\d+)[、､]", "数字顿号"))
 
-        elif t == "数字空格":
-            results.append(_digit_pat(r"(?<![.\d])(\d+)(?!\.\d)[　 ]+", "数字空格"))
         elif t == "数字条":
 
             results.append(_dotted_pat(r"第(\d+(?:[\.．]\d+)*)条", "数字条"))
@@ -420,7 +430,7 @@ def _di_prefix_filter(name, m):
 
 # \u53f3\u62ec\u53f7/\u6761\u7ae0\u5b88\u536b \u2014 \u4ece\u6570\u5b57\u7a7a\u683c/\u6570\u5b57\u76f4\u8fde\u4e2d\u6587 extractor \u63d0\u5347\u4e3a\u524d\u7f6e\u8fc7\u6ee4
 
-_RGUARD_RBRACK = set('\u2019\u201d\u300d\u300f\u300b\u3009\uff09])\u3015\uff63，。')
+_RGUARD_RBRACK = set('\u2019\u201d\u300d\u300f\u300b\u3009\uff09])\u3015\uff63')
 
 
 
@@ -539,13 +549,5 @@ def iter_matches(patterns, text, type_names=None, extra_filters=None):
 
 # 这些类型的组标记由 compute_group_marks 计算，供路径B二次回卷使用。
 
-PATH_B_TYPES = frozenset({
-
-    "\u7ae0", "\u8282", "\u7f16", "\u90e8\u5206",
-
-    "\u6570\u5b57\u6761", "\u6570\u5b57\u7ae0", "\u6570\u5b57\u8282", "\u6570\u5b57\u76f4\u8fde\u4e2d\u6587",
-
-    "\u6570\u5b57\u7a7a\u683c", "\u4e2d\u6587\u662f", "\u8981\u7d20\u6570\u5b57\u5192\u53f7",
-
-})
+PATH_B_TYPES = frozenset()
 

@@ -29,8 +29,9 @@ def split_plain_by_paragraphs(text):
 
 
 SPLIT_TYPES = [
-    "条", "章", "节", "编", "部分",
-    "括号", "中文顿号", "数字顿号", "数字空格",
+    "条", "章", "节", "编", "部分", "数字部分",
+    "要", "篇",
+    "括号", "括号数字", "中文顿号", "数字顿号",
     "数字条", "数字章", "数字节",
     "数字点", "数字点点", "数字直连中文",
     "文书类型",
@@ -40,7 +41,7 @@ SPLIT_TYPES = [
 # ---- 打分引擎拦截类型：这些类型不走 Path A/B，只走打分 ----
 SCORED_TYPES = {
     "数字条", "数字点", "数字点点",
-    "数字直连中文", "数字空格", "数字节",
+    "数字直连中文", "数字节",
 }
 
 # 数据库路径配置：
@@ -86,19 +87,21 @@ def find_split_point_for_types(content, type_names):
     return None
 
 # ===== 打分路径：拦截 SCORED_TYPES，替代 Path A/B =====
-def _scoring_path_combined(group_data, split_type_order, score_collector=None):
-    """对所有 SCORED_TYPES 的行合并打分，返回 {tp: set of uid} 标记。
+def _scoring_path_combined(group_data, split_type_order, score_collector=None, scored_types=None):
+    """对所有 scored_types 的行合并打分，返回 {tp: set of uid} 标记。
 
     合并打分保证跨类型的层级关系（如 '3' 与 '3.1'）不丢失。
 
     若 score_collector 传入，则写入打分明细：
         score_collector[tp] = {"ords": [...], "scores": [...], "kept_mask": [...]}
     """
-    scored_used = [tp for tp in split_type_order if tp in SCORED_TYPES]
+    if scored_types is None:
+        scored_types = SCORED_TYPES
+    scored_used = [tp for tp in split_type_order if tp in scored_types]
     if not scored_used:
         return {}
 
-    all_rows = [r for r in group_data if r.get("split_type") in SCORED_TYPES]
+    all_rows = [r for r in group_data if r.get("split_type") in scored_types]
     if len(all_rows) < 2:
         return {}
 
@@ -153,7 +156,6 @@ def _prefix_share_root(prefix_a, prefix_b):
 def _path_b_mark(tp, group, group_data):
     """路径B：建堆 → 堆延长 → 标记干扰（仅同类型），返回待回卷 uid 集合"""
     # group: [(row, last), ...] 按 seq 已排序
-
     to_rollback = set()
 
     # 1. 建堆：按 seq 物理顺序，相邻且序数连续则同堆
@@ -190,7 +192,50 @@ def _path_b_mark(tp, group, group_data):
             "uids": {r["uid"] for r, _ in h},
         })
 
-    # 2. 堆延长：DP 价值驱动的候选选择
+    # 2. 括号数字：分数制导链选择
+    if tp == "括号数字":
+        def _score_chain(h):
+            length = len(h.get("ordinals", []))
+            s = length * 10
+            if h.get("start_ord") == 1:
+                if length >= 3:
+                    s += length * 5
+                elif length <= 2:
+                    s -= 7
+            else:
+                if length <= 2:
+                    s -= 2
+                else:
+                    s -= 1
+            return s
+
+        for h in heap_info:
+            h["score"] = _score_chain(h)
+        heap_info.sort(key=lambda h: h["score"], reverse=True)
+
+        kept_ordinals = {}
+        for h in heap_info:
+            for i, uid in enumerate(h["uids"]):
+                ordinal = h["ordinals"][i]
+                if ordinal not in kept_ordinals:
+                    kept_ordinals[ordinal] = uid
+
+        for h in heap_info:
+            for i, uid in enumerate(h["uids"]):
+                ordinal = h["ordinals"][i]
+                if kept_ordinals.get(ordinal) != uid:
+                    to_rollback.add(uid)
+
+        all_heap_uids = set()
+        for h in heap_info:
+            all_heap_uids.update(h["uids"])
+        for r, _ in group:
+            if r["uid"] not in all_heap_uids:
+                to_rollback.add(r["uid"])
+
+        return to_rollback
+
+    # 3. 堆延长：DP 价值驱动的候选选择
     #
     #   只有 start_ord==1 的堆有权延伸。
     #   当存在多个 start_ord == end_ord+1 的候选堆时，对每个候选执行 DP 计算
@@ -198,7 +243,8 @@ def _path_b_mark(tp, group, group_data):
     #   这保证选"远期总价值最大"的链，而非简单地按位置近的优先。
     #
     merged_indices = set()
-    skip = (tp == "条")
+    skip = 1 if (tp == "条") else 0  # +2跳号次数，条初始1次
+    skipped_ords = []  # 记录+2跳过的序数，用于打分补位
 
     def _chain_value(h_idx, available, memo):
         """从 heap_info[h_idx] 开始，沿 +1 扩展链能获得的最大序数加权和"""
@@ -251,8 +297,8 @@ def _path_b_mark(tp, group, group_data):
             if found:
                 continue
 
-            # +2 跳过延长 — 仅条、长堆(>=6)、仅一次
-            if skip and len(h1["ordinals"]) >= 6:
+            # +2 跳过延长 — 仅条、长堆(>=6)，次数有限
+            if skip > 0 and len(h1["ordinals"]) >= 6:
                 cand_plus2 = [
                     j for j in available if j != i
                     and heap_info[j]["min_seq"] > h1["end_seq"]
@@ -264,6 +310,7 @@ def _path_b_mark(tp, group, group_data):
                     scored.sort(key=lambda x: (-x[1], heap_info[x[0]]["min_seq"]))
                     best_j = scored[0][0]
                     h2 = heap_info[best_j]
+                    skipped_ords.append(h1["end_ord"] + 1)  # 记录跳过的序数
                     h1["ordinals"] = sorted(set(h1["ordinals"] + h2["ordinals"]))
                     h1["end_ord"] = h2["end_ord"]
                     h1["min_seq"] = min(h1["min_seq"], h2["min_seq"])
@@ -271,9 +318,12 @@ def _path_b_mark(tp, group, group_data):
                     h1["end_seq"] = h2["end_seq"]
                     h1["uids"].update(h2["uids"])
                     merged_indices.add(best_j)
-                    skip = False
+                    skip -= 1
                     found = True
 
+            # 长堆(>=18)奖励一次额外跳号机会
+            if tp == "条" and len(h1["ordinals"]) >= 18 and skip == 0:
+                skip = 1
             if not found:
                 break
 
@@ -281,11 +331,17 @@ def _path_b_mark(tp, group, group_data):
     heap_info = [h for idx, h in enumerate(heap_info) if idx not in merged_indices]
 
     # 3. 标记干扰元素（仅同类型）
-    for heap in heap_info:
+    # 1开头堆按seq排序，维护边界：后面的1开头堆只标边界后的干扰
+    heaps_by_seq = sorted(heap_info, key=lambda h: h["min_seq"])
+    boundary = 0
+    for heap in heaps_by_seq:
+        lo = max(heap["min_seq"], boundary + 1) if heap["start_ord"] == 1 else heap["min_seq"]
         for r in group_data:
-            if heap["min_seq"] <= r["seq"] <= heap["max_seq"]:
+            if lo <= r["seq"] <= heap["max_seq"]:
                 if r.get("split_type") == tp and r["uid"] not in heap["uids"]:
                     to_rollback.add(r["uid"])
+        if heap["start_ord"] == 1:
+            boundary = heap["max_seq"]
 
     # 不在任何堆内的同类型元素也标记
     all_heap_uids = set()
@@ -313,8 +369,16 @@ def _path_b_mark(tp, group, group_data):
                     ord_strs.append('.'.join(str(x) for x in o))
                 else:
                     ord_strs.append(str(o))
+            # 补入+2跳号时跳过的序数，使打分不因缺口误杀
+            if skipped_ords:
+                for so in skipped_ords:
+                    ord_strs.append(str(so))
+                ord_strs.sort(key=lambda s: tuple(int(x) for x in s.split('.')))
             if len(ord_strs) >= 2:
                 scores, kept_mask = score_ordinals(ord_strs)
+                # 只对原始 survivors 应用 keep/drop，补入的跳过序数不参与
+                real_n = len(survivors)
+                kept_mask = kept_mask[:real_n]
                 for r, keep in zip(survivors, kept_mask):
                     if not keep:
                         to_rollback.add(r["uid"])
@@ -338,11 +402,16 @@ def global_backward_rollback(group_data, group_name, split_type_order, score_col
     all_marks = {}  # {tp: set of uids}
 
     # 打分拦截：SCORED_TYPES 合并打分，跳过 Path A/B
-    scored_marks = _scoring_path_combined(group_data, split_type_order, score_collector)
+    # 规则：存在数字点或数字点点时，数字条/数字节不走打分，改走 Path B
+    effective_scored = set(SCORED_TYPES)
+    if any(t in split_type_order for t in ("数字点", "数字点点")):
+        effective_scored.discard("数字条")
+        effective_scored.discard("数字节")
+    scored_marks = _scoring_path_combined(group_data, split_type_order, score_collector, effective_scored)
     all_marks.update(scored_marks)
 
     for tp in split_type_order:
-        if tp in SCORED_TYPES or tp == "文书类型":
+        if tp in effective_scored or tp == "文书类型":
             continue  # 已由打分引擎处理
 
         rows = [r for r in group_data if r.get("split_type") == tp]
@@ -752,73 +821,72 @@ def _bracket_secondary_rollback(group_data, group_name, verbose=True):
     """
     _v = (lambda *a, **kw: None) if not verbose else print
 
-    # 1. 收集括号行
-    bracket_rows = [(r, get_ordinal(r["content"]))
-                    for r in group_data if r.get("split_type") == "括号"]
-    bracket_rows = [(r, o) for r, o in bracket_rows if o is not None]
-    if len(bracket_rows) < 2:
-        return group_data
-    bracket_rows.sort(key=lambda x: x[0]["seq"])
+    # 1. 对括号和括号数字各自独立回卷
+    all_rollback = set()
+    for _bt in ("括号", "括号数字"):
+        bracket_rows = [(r, get_ordinal(r["content"]))
+                        for r in group_data if r.get("split_type") == _bt]
+        bracket_rows = [(r, o) for r, o in bracket_rows if o is not None]
+        if len(bracket_rows) < 2:
+            continue
+        bracket_rows.sort(key=lambda x: x[0]["seq"])
 
-    # 2. 建堆（同 _path_b_mark 逻辑）
-    heaps = []
-    current = []
-    for r, o in bracket_rows:
-        prefix, last = _ordinal_prefix(o)
-        if not current:
-            current = [(r, prefix, last)]
-        elif prefix == current[-1][1] and last == current[-1][2] + 1:
-            current.append((r, prefix, last))
-        else:
+        # 2. 建堆
+        heaps = []
+        current = []
+        for r, o in bracket_rows:
+            prefix, last = _ordinal_prefix(o)
+            if not current:
+                current = [(r, prefix, last)]
+            elif prefix == current[-1][1] and last == current[-1][2] + 1:
+                current.append((r, prefix, last))
+            else:
+                heaps.append(current)
+                current = [(r, prefix, last)]
+        if current:
             heaps.append(current)
-            current = [(r, prefix, last)]
-    if current:
-        heaps.append(current)
 
-    heap_info = []
-    for h in heaps:
-        ordinals = [last for _, _, last in h]
-        seqs = [r["seq"] for r, _, _ in h]
-        heap_info.append({
-            "uids": {r["uid"] for r, _, _ in h},
-            "min_seq": min(seqs),
-            "max_seq": max(seqs),
-            "max_n": ordinals[-1] - ordinals[0] + 1 if ordinals else 0,
-            "start_ord": ordinals[0],
-            "end_ord": ordinals[-1],
-        })
+        heap_info = []
+        for h in heaps:
+            ordinals = [last for _, _, last in h]
+            seqs = [r["seq"] for r, _, _ in h]
+            heap_info.append({
+                "uids": {r["uid"] for r, _, _ in h},
+                "min_seq": min(seqs),
+                "max_seq": max(seqs),
+                "max_n": ordinals[-1] - ordinals[0] + 1 if ordinals else 0,
+                "start_ord": ordinals[0],
+                "end_ord": ordinals[-1],
+            })
 
-    # 3. 标记符合条件的短堆
-    to_rollback = set()
-    for i, h in enumerate(heap_info):
-        if h["max_n"] > 2:
-            continue  # 不是短堆
-
-        connected = False
-        for j, other in enumerate(heap_info):
-            if i == j:
+        # 3. 标记符合条件的短堆
+        for i, h in enumerate(heap_info):
+            if h["max_n"] > 2:
                 continue
-            # seq 紧邻判断
-            if h["min_seq"] == other["max_seq"] + 1 or h["max_seq"] + 1 == other["min_seq"]:
-                connected = True
-                # 对方也是短堆 → 只标记 seq 靠后的那个
-                if other["max_n"] <= 2:
-                    if h["min_seq"] < other["min_seq"]:
-                        connected = False  # h 在前，不标记
-                break
 
-        if connected:
-            to_rollback.update(h["uids"])
+            connected = False
+            for j, other in enumerate(heap_info):
+                if i == j:
+                    continue
+                if h["min_seq"] == other["max_seq"] + 1 or h["max_seq"] + 1 == other["min_seq"]:
+                    connected = True
+                    if other["max_n"] <= 2:
+                        if h["min_seq"] < other["min_seq"]:
+                            connected = False
+                    break
 
-    if not to_rollback:
+            if connected:
+                all_rollback.update(h["uids"])
+
+    if not all_rollback:
         return group_data
 
-    _v(f"   括号二次回卷：标记 {len(to_rollback)} 个元素")
+    _v(f"   括号二次回卷：标记 {len(all_rollback)} 个元素")
 
     # 4. 吸收（调用共享吸收函数）
     uid_to_seq = {r["uid"]: r["seq"] for r in group_data}
     marked_seqs = sorted(
-        [uid_to_seq[uid] for uid in to_rollback if uid in uid_to_seq],
+        [uid_to_seq[uid] for uid in all_rollback if uid in uid_to_seq],
         reverse=True
     )
     if marked_seqs:
@@ -1015,7 +1083,7 @@ def split_single_group_with_rollback(group_data, group_name, split_types_overrid
     _v(f"    回卷结束，当前共 {len(group_data)} 行。")
 
     # ---- 括号类型二次回卷 ----
-    if "括号" in split_type_list:
+    if "括号" in split_type_list or "括号数字" in split_type_list:
         _v(f"  [{group_name}] 开始括号二次回卷...")
         group_data = _bracket_secondary_rollback(group_data, group_name, verbose=verbose)
         for idx, r in enumerate(group_data):
