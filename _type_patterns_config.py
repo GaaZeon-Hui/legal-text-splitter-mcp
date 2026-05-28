@@ -186,15 +186,27 @@ def _build_type_patterns_cached(types_tuple):
 
             results.append(_cn_pat("第{cn}部分", "部分"))
 
+        elif t == "数字部分":
+
+            results.append(_digit_pat(r"第(\d+)部分", "数字部分"))
+
+        elif t == "要":
+
+            results.append(_cn_pat("{cn}要", "要"))
+
+        elif t == "篇":
+
+            results.append(_cn_pat("第{cn}篇", "篇"))
+
         elif t == "括号":
 
-            pat = _LBR + r"[（(](\d+|" + CN_NUM + r")[）)]"
+            pat = _LBR + r"[（(](" + CN_NUM + r")[）)]"
 
-            results.append(("括号", re.compile(pat),
+            results.append(("括号", re.compile(pat), lambda m: cn2int(m.group(1))))
 
-                            lambda m: int(m.group(1)) if m.group(1).isdigit()
+        elif t == "括号数字":
 
-                            else cn2int(m.group(1))))
+            results.append(_digit_pat(r"[（(](\d+)[）)]", "括号数字"))
 
         elif t == "中文顿号":
 
@@ -206,8 +218,6 @@ def _build_type_patterns_cached(types_tuple):
 
             results.append(_digit_pat(r"(\d+)[、､]", "数字顿号"))
 
-        elif t == "数字空格":
-            results.append(_digit_pat(r"(?<![.\d])(\d+)(?!\.\d)[　 ]+", "数字空格"))
         elif t == "数字条":
 
             results.append(_dotted_pat(r"第(\d+(?:[\.．]\d+)*)条", "数字条"))
@@ -241,7 +251,11 @@ def _build_type_patterns_cached(types_tuple):
                             if ('.' in m.group(1) or '．' in m.group(1)) else int(m.group(1))))
 
         elif t == "数字直连中文":
-            results.append(_digit_pat(r"(?<![.\d])(\d+)(?!\.\d)[　 ]?(?=[一-鿿])", "数字直连中文"))
+            results.append(_digit_pat(r"(?<![.\d])(\d+)(?!\.\d)[　 ]?(?=[一-鿿A-Z])", "数字直连中文"))
+        elif t == "文书类型":
+            def _wslx_ext(m):
+                return 1
+            results.append(("文书类型", re.compile(_LBR + r"《(规划|规定|意见|通知)》"), _wslx_ext))
         elif t == "中文是":
 
             results.append(_cn_pat("{cn}是", "中文是"))
@@ -282,7 +296,7 @@ def build_type_patterns(types_list):
 
 
 
-LEFT_BRACKETS = set('\u2018\u201c\u300c\u300e\u300a\u3008\uff08[(\u3014\uff62')
+LEFT_BRACKETS = set('\u2018\u201c\u300c\u300e\u300a\u3008\uff08[(\u3014\uff62\u3001\uff0c')
 
 SKIP_DANZI = set('过见')
 
@@ -424,13 +438,13 @@ def _post_match_guard(name, m):
 
     """\u6570\u5b57\u7a7a\u683c/\u6570\u5b57\u76f4\u8fde\u4e2d\u6587 \u53f3\u62ec\u53f7+\u6761\u7ae0\u5b88\u536b\u3002"""
 
-    if name not in ("\u6570\u5b57\u7a7a\u683c", "\u6570\u5b57\u76f4\u8fde\u4e2d\u6587"):
+    if name not in ("\u6570\u5b57\u70b9", "\u6570\u5b57\u70b9\u70b9", "\u6570\u5b57\u76f4\u8fde\u4e2d\u6587"):
 
         return False
 
     if m.end() < len(m.string):
 
-        after = m.string[m.end():].lstrip()[:6]
+        after = m.string[m.end():m.end()+5]
 
         if any(c in _RGUARD_RBRACK for c in after):
 
@@ -450,7 +464,29 @@ def _post_match_guard(name, m):
 
 # \u524d\u7f6e\u8fc7\u6ee4\u5668\u5217\u8868\uff1a\u6bcf\u4e2a filter(name, m) \u2192 True \u8868\u793a\u8df3\u8fc7\u8be5\u5339\u914d
 
+def _wslx_post_guard(name, m):
+    """文书类型专用右守卫：右邻含右括号/标点即拦（不含，。）"""
+    if name != "文书类型":
+        return False
+    if m.end() < len(m.string):
+        after = m.string[m.end():].lstrip()
+        if after and after[0] in _RGUARD_RBRACK:
+            return True
+    return False
+
+def _genju_guard(name, m):
+    """skip matches preceded by u6839u636e."""
+    if m.start() > 0:
+        j = m.start() - 1
+        while j >= 0 and ord(m.string[j]) in (32, 9, 10, 13, 0x3000, 0x00a0):
+            j -= 1
+        if j >= 1 and m.string[j-1:j+1] == chr(0x6839) + chr(0x636e):
+            return True
+    return False
+
 PRE_MATCH_FILTERS = [
+
+    _genju_guard,
 
     _bracket_filter,
 
@@ -463,6 +499,7 @@ PRE_MATCH_FILTERS = [
     _di_prefix_filter,
 
     _post_match_guard,
+    _wslx_post_guard,
 
 ]
 
@@ -512,13 +549,5 @@ def iter_matches(patterns, text, type_names=None, extra_filters=None):
 
 # 这些类型的组标记由 compute_group_marks 计算，供路径B二次回卷使用。
 
-PATH_B_TYPES = frozenset({
-
-    "\u7ae0", "\u8282", "\u7f16", "\u90e8\u5206",
-
-    "\u6570\u5b57\u6761", "\u6570\u5b57\u7ae0", "\u6570\u5b57\u8282", "\u6570\u5b57\u76f4\u8fde\u4e2d\u6587",
-
-    "\u6570\u5b57\u7a7a\u683c", "\u4e2d\u6587\u662f", "\u8981\u7d20\u6570\u5b57\u5192\u53f7",
-
-})
+PATH_B_TYPES = frozenset()
 

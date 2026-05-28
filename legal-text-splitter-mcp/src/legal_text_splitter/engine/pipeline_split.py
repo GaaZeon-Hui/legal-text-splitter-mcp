@@ -37,7 +37,18 @@ except ImportError:
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "2")
 os.environ.setdefault("OMP_NUM_THREADS", "2")
 
+# --- 数据源 ---
+# "db"  = 从数据库读取全部 law_id（--all）
+# "excel" = 从 Excel 读取 law_id 列表（--batch）
+LAW_ID_SOURCE = "excel"
+
+# Excel 输入（仅 LAW_ID_SOURCE = "excel" 时生效）
+LAW_ID_EXCEL_FILE = "506.xlsx"
+LAW_ID_EXCEL_SHEET = "Sheet1"
+LAW_ID_EXCEL_COLUMN = "law_id"
+
 # --- 输出 ---
+OUTPUT_EXCEL = "506-result-7.xlsx"
 SAVE_JSON_SNAPSHOT = True                   # 每 N 条存 JSON 快照（防崩溃）
 SNAPSHOT_INTERVAL = 50                      # 快照间隔（条）
 BATCH_DELAY_SECONDS = 0.02                  # 每条处理后的等待秒数
@@ -59,8 +70,13 @@ _spec_post = util.spec_from_file_location(
 _mod_post = util.module_from_spec(_spec_post)
 _spec_post.loader.exec_module(_mod_post)
 
-# DB_CONFIG is now built from environment variables at connection time.
-# See _get_db_connection() below.
+DB_CONFIG = {
+    "host": "192.168.1.109",
+    "port": 8001,
+    "user": "xoops_root",
+    "password": "654321",
+    "database": "mtai_serv",
+}
 
 analyze = _mod_analyze.analyze
 print_report = _mod_analyze.print_report
@@ -88,16 +104,8 @@ def _ensure_pymysql():
 
 
 def _get_db_connection():
-    import os as _os4db
     _pm = _ensure_pymysql()
-    _cfg = {
-        "host": _os4db.environ.get("LEGAL_DB_HOST", "localhost"),
-        "port": int(_os4db.environ.get("LEGAL_DB_PORT", "3306")),
-        "user": _os4db.environ.get("LEGAL_DB_USER", "root"),
-        "password": _os4db.environ.get("LEGAL_DB_PASSWORD", ""),
-        "database": _os4db.environ.get("LEGAL_DB_NAME", "legal_db"),
-    }
-    return _pm.connect(**_cfg)
+    return _pm.connect(**DB_CONFIG)
 
 
 def _fetch_text(cursor, law_id):
@@ -132,9 +140,12 @@ def process_text(raw_text, law_id="input", score_collector=None, quiet=True):
     }
 
     try:
-        # 1. 分析拆分类型
-        raw_results = analyze(raw_text)
-        analysis_report = print_report(raw_results, raw_text, law_id=law_id, quiet=quiet)
+        # 1. 先清洗再分析
+        cleaned_text = clean_html(raw_text)
+
+        # 2. 分析拆分类型
+        raw_results = analyze(cleaned_text)
+        analysis_report = print_report(raw_results, cleaned_text, law_id=law_id, quiet=quiet)
         result["analysis"] = analysis_report
 
         all_tags = analysis_report.get("all_tags", [])
@@ -145,8 +156,7 @@ def process_text(raw_text, law_id="input", score_collector=None, quiet=True):
         all_tags = ordered + remaining
         result["split_types"] = all_tags
 
-        # 2. 清洗 + 保护 + 拆分
-        cleaned_text = clean_html(raw_text)
+        # 3. 保护 + 拆分
         cleaned_text, prot_blocks = _apply_protection(cleaned_text)
 
         if "纯文本段落拆分" in all_tags:
@@ -364,28 +374,25 @@ def pipeline_run(law_ids):
     print(f"共 {total} 条，开始流水线处理...\n")
 
     for i, lid in enumerate(law_ids, start=1):
-        pct = i / total * 100
-        elapsed = time.time() - t_start
-        eta = (elapsed / i) * (total - i) if i > 0 else 0
-        bar_width = 20
-        filled = int(bar_width * i / total)
-        bar = "[" + "=" * filled + " " * (bar_width - filled) + "]"
-
-        status_line = f"\r  {bar} {i}/{total} ({pct:.1f}%)  ETA {eta:.0f}s  {lid[:20]}..."
-        print(status_line, end="", flush=True)
-
         result = process_single_law(lid, conn)
         all_results.append(result)
 
         if result["error"]:
-            err_msg = result["error"].split('\n')[0]  # 第一行是类型+信息
+            err_msg = result["error"].split('\n')[0]
             print(f"\n  [FAIL] {lid} — {err_msg}")
-        elif result["analysis"]:
-            tags = ", ".join(result["split_types"])
-            extra = f"  [{tags}]  -> {result['split_count']} fragments"
-            print(f"\r  {bar} {i}/{total} ({pct:.1f}%)  ETA {eta:.0f}s  {lid[:20]}...{extra}")
-        else:
-            print()
+        if i % 100 == 0 or i == total:
+            pct = i / total * 100
+            elapsed = time.time() - t_start
+            eta = (elapsed / i) * (total - i) if i > 0 else 0
+            bar_width = 20
+            filled = int(bar_width * i / total)
+            bar = "[" + "=" * filled + " " * (bar_width - filled) + "]"
+            latest = all_results[-1]
+            tail = ""
+            if not latest["error"] and latest["analysis"]:
+                tags = ", ".join(latest["split_types"])
+                tail = f"  [{tags}]  -> {latest['split_count']} fragments"
+            print(f"\r  {bar} {i}/{total} ({pct:.1f}%)  ETA {eta:.0f}s  {lid[:20]}...{tail}")
 
         if SAVE_JSON_SNAPSHOT and i % SNAPSHOT_INTERVAL == 0:
             _save_snapshot(all_results, snapshot_path)

@@ -6,30 +6,33 @@ from nicegui import app, ui
 def build():
     result = app.storage.user.get('last_result')
     if not result:
-        with ui.column().classes('w-full items-center p-8'):
-            ui.label('没有拆分结果，请返回主页重新拆分').classes('text-lg text-grey')
-            ui.button('返回主页', on_click=lambda: ui.navigate.to('/'))
+        with ui.column().classes('w-full items-center p-16 gap-4'):
+            ui.icon('warning').classes('text-5xl text-grey-5')
+            ui.label('没有拆分结果').classes('text-lg text-grey-7')
+            ui.button('返回主页', icon='home', on_click=lambda: ui.navigate.to('/')) \
+                .props('unelevated color=primary')
         return
 
     fragments = result.get('fragments', [])
     meta = result.get('meta', {})
 
-    with ui.header().classes('bg-primary text-white'):
-        with ui.row().classes('w-full items-center justify-between p-2'):
-            with ui.row().classes('items-center gap-2'):
+    with ui.header().classes('bg-grey-10 text-white'):
+        with ui.row().classes('w-full items-center justify-between px-4 py-2'):
+            with ui.row().classes('items-center gap-3'):
                 ui.button(icon='arrow_back', on_click=lambda: ui.navigate.to('/')) \
                     .props('flat text-white')
+                ui.icon('checklist').classes('text-2xl')
                 ui.label('拆分结果').classes('text-xl font-bold')
-            ui.button('导出 Excel', icon='download', on_click=lambda: _do_export()) \
-                .props('flat text-white')
+            ui.button('导出 Excel', icon='save_alt', on_click=lambda: _do_export()) \
+                .props('color=amber text-weight-bold')
 
     with ui.column().classes('w-full p-4 gap-4'):
-        with ui.row().classes('w-full flex-wrap gap-4 items-center bg-grey-1 p-3 rounded-lg'):
-            ui.label(f'字符数: {meta.get("char_count", 0):,}').classes('text-sm')
-            ui.label(f'片段数: {meta.get("fragment_count", 0):,}').classes('text-sm font-bold')
-            ui.label(f'类型: {", ".join(meta.get("all_tags", [])) or "-"}').classes('text-sm')
-            ui.label(f'层级: {meta.get("level_chain", "-")}').classes('text-sm')
-            ui.label(f'耗时: {meta.get("processing_ms", 0)}ms').classes('text-sm')
+        with ui.row().classes('w-full flex-wrap gap-x-6 gap-y-1 items-center bg-grey-2 px-4 py-3 rounded-lg'):
+            ui.label(f'字符数: {meta.get("char_count", 0):,}').classes('text-sm text-grey-8')
+            ui.label(f'片段数: {meta.get("fragment_count", 0):,}').classes('text-sm font-bold text-deep-orange-8')
+            ui.label(f'类型: {", ".join(meta.get("all_tags", [])) or "-"}').classes('text-sm text-grey-8')
+            ui.label(f'层级: {meta.get("level_chain", "-")}').classes('text-sm text-grey-8')
+            ui.label(f'耗时: {meta.get("processing_ms", 0)}ms').classes('text-sm text-grey-6')
 
 
         if fragments:
@@ -131,7 +134,13 @@ def _build_pretext_table(fragments):
                     ui.button('关闭', on_click=dialog.close)
             dialog.open()
 
-    ui.timer(0.3, _check_click)
+    async def _safe_check_click():
+        try:
+            await _check_click()
+        except RuntimeError:
+            pass
+
+    ui.timer(0.3, _safe_check_click)
 
 
 def _fmt_ordinal(ordinal):
@@ -145,7 +154,7 @@ def _fmt_ordinal(ordinal):
 def _do_export():
     result = app.storage.user.get('last_result', {})
     fragments = result.get('fragments', [])
-    import io
+    import io, os
     try:
         import openpyxl
     except ImportError:
@@ -167,4 +176,18 @@ def _do_export():
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    ui.download(output.read(), '拆分结果.xlsx')
+
+    from tkinter import Tk, filedialog
+    root = Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    path = filedialog.asksaveasfilename(
+        defaultextension='.xlsx',
+        filetypes=[('Excel 文件', '*.xlsx'), ('所有文件', '*.*')],
+        initialfile='拆分结果.xlsx',
+    )
+    root.destroy()
+    if path:
+        with open(path, 'wb') as f:
+            f.write(output.read())
+        ui.notify(f'已保存: {os.path.basename(path)}', type='positive')

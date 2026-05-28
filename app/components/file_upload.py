@@ -88,6 +88,7 @@ class FileUpload:
     def __init__(self, on_text_changed=None, on_law_ids_changed=None):
         self.on_text_changed = on_text_changed
         self.on_law_ids_changed = on_law_ids_changed
+        self._xlsx_name = None
 
         with ui.column().classes('w-full gap-2'):
             # Upload area
@@ -98,12 +99,34 @@ class FileUpload:
                 max_file_size=MAX_FILE_SIZE,
             ).classes('w-full').props('accept=.txt,.docx,.xlsx')
 
+            # Excel status
+            self._xlsx_label = ui.label('').classes('text-xs text-grey-6')
+
             # Shared textarea
             self.textarea = ui.textarea(
                 '法条文本',
                 placeholder='上传文件或在此粘贴法条原文…',
                 on_change=lambda e: self._on_text_change(),
             ).classes('w-full h-64')
+
+            # Paste from clipboard
+            with ui.row().classes('w-full justify-end'):
+                ui.button('从剪切板粘贴', icon='content_paste', on_click=self._paste_clipboard) \
+                    .props('flat size=sm text-grey-6')
+
+    async def _paste_clipboard(self):
+        """Paste clipboard content into the textarea."""
+        try:
+            from nicegui import app as ng_app
+            text = await ui.run_javascript('return navigator.clipboard.readText()', timeout=1)
+            if text:
+                self.textarea.value = text
+                self._on_text_change()
+                ui.notify('已粘贴', type='positive')
+            else:
+                ui.notify('剪切板为空', type='warning')
+        except Exception:
+            ui.notify('无法访问剪切板，请手动 Ctrl+V', type='warning')
 
     def _on_text_change(self):
         if self.on_text_changed:
@@ -146,6 +169,8 @@ class FileUpload:
                     self.upload.reset()
                     return
 
+                self._xlsx_label.set_text(
+                    f'已加载: {e.file.name} ({len(law_ids)} 条)')
                 if self.on_law_ids_changed:
                     self.on_law_ids_changed(law_ids)
                 self.upload.reset()

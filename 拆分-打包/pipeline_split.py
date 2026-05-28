@@ -140,9 +140,12 @@ def process_text(raw_text, law_id="input", score_collector=None, quiet=True):
     }
 
     try:
-        # 1. 分析拆分类型
-        raw_results = analyze(raw_text)
-        analysis_report = print_report(raw_results, raw_text, law_id=law_id, quiet=quiet)
+        # 1. 先清洗再分析
+        cleaned_text = clean_html(raw_text)
+
+        # 2. 分析拆分类型
+        raw_results = analyze(cleaned_text)
+        analysis_report = print_report(raw_results, cleaned_text, law_id=law_id, quiet=quiet)
         result["analysis"] = analysis_report
 
         all_tags = analysis_report.get("all_tags", [])
@@ -153,8 +156,7 @@ def process_text(raw_text, law_id="input", score_collector=None, quiet=True):
         all_tags = ordered + remaining
         result["split_types"] = all_tags
 
-        # 2. 清洗 + 保护 + 拆分
-        cleaned_text = clean_html(raw_text)
+        # 3. 保护 + 拆分
         cleaned_text, prot_blocks = _apply_protection(cleaned_text)
 
         if "纯文本段落拆分" in all_tags:
@@ -372,28 +374,25 @@ def pipeline_run(law_ids):
     print(f"共 {total} 条，开始流水线处理...\n")
 
     for i, lid in enumerate(law_ids, start=1):
-        pct = i / total * 100
-        elapsed = time.time() - t_start
-        eta = (elapsed / i) * (total - i) if i > 0 else 0
-        bar_width = 20
-        filled = int(bar_width * i / total)
-        bar = "[" + "=" * filled + " " * (bar_width - filled) + "]"
-
-        status_line = f"\r  {bar} {i}/{total} ({pct:.1f}%)  ETA {eta:.0f}s  {lid[:20]}..."
-        print(status_line, end="", flush=True)
-
         result = process_single_law(lid, conn)
         all_results.append(result)
 
         if result["error"]:
-            err_msg = result["error"].split('\n')[0]  # 第一行是类型+信息
+            err_msg = result["error"].split('\n')[0]
             print(f"\n  [FAIL] {lid} — {err_msg}")
-        elif result["analysis"]:
-            tags = ", ".join(result["split_types"])
-            extra = f"  [{tags}]  -> {result['split_count']} fragments"
-            print(f"\r  {bar} {i}/{total} ({pct:.1f}%)  ETA {eta:.0f}s  {lid[:20]}...{extra}")
-        else:
-            print()
+        if i % 100 == 0 or i == total:
+            pct = i / total * 100
+            elapsed = time.time() - t_start
+            eta = (elapsed / i) * (total - i) if i > 0 else 0
+            bar_width = 20
+            filled = int(bar_width * i / total)
+            bar = "[" + "=" * filled + " " * (bar_width - filled) + "]"
+            latest = all_results[-1]
+            tail = ""
+            if not latest["error"] and latest["analysis"]:
+                tags = ", ".join(latest["split_types"])
+                tail = f"  [{tags}]  -> {latest['split_count']} fragments"
+            print(f"\r  {bar} {i}/{total} ({pct:.1f}%)  ETA {eta:.0f}s  {lid[:20]}...{tail}")
 
         if SAVE_JSON_SNAPSHOT and i % SNAPSHOT_INTERVAL == 0:
             _save_snapshot(all_results, snapshot_path)

@@ -2,7 +2,8 @@
 import httpx
 
 SERVICE_URL = 'http://127.0.0.1:8001'
-REQUEST_TIMEOUT = 30.0  # seconds
+REQUEST_TIMEOUT = 30.0        # seconds, for single-text split
+BATCH_TIMEOUT = 600.0         # seconds, for batch DB split
 
 
 class ServiceClient:
@@ -46,7 +47,7 @@ class ServiceClient:
         Raises ServiceError on non-200 response or network failure.
         """
         body = {'law_ids': law_ids}
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=BATCH_TIMEOUT) as client:
             r = await client.post(
                 f'{self.base_url}/api/split-by-ids',
                 json=body,
