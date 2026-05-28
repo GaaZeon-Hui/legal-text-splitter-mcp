@@ -33,6 +33,7 @@ SPLIT_TYPES = [
     "括号", "中文顿号", "数字顿号", "数字空格",
     "数字条", "数字章", "数字节",
     "数字点", "数字点点", "数字直连中文",
+    "文书类型",
     "中文是", "要素数字冒号",
 ]
 
@@ -341,7 +342,7 @@ def global_backward_rollback(group_data, group_name, split_type_order, score_col
     all_marks.update(scored_marks)
 
     for tp in split_type_order:
-        if tp in SCORED_TYPES:
+        if tp in SCORED_TYPES or tp == "文书类型":
             continue  # 已由打分引擎处理
 
         rows = [r for r in group_data if r.get("split_type") == tp]
@@ -989,6 +990,12 @@ def split_single_group_with_rollback(group_data, group_name, split_types_overrid
                 uid_counter += 1
                 group_data.insert(i + 1, new_item)
                 for idx, r in enumerate(group_data): r["seq"] = idx + 1
+            # 位置0匹配：片段开头即匹配当前阶段类型时补标 split_type
+            if cur.get("split_type") is None:
+                for name, pat, func, m in iter_matches(type_patterns, cur["content"], type_names=stage_types):
+                    if m.start() == 0:
+                        cur["split_type"] = name
+                        break
             i += 1
         _v(f"    阶段 [{stage_type}] 拆分结束，当前共 {len(group_data)} 行。")
 

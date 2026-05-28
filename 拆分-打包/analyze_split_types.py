@@ -29,6 +29,7 @@ SPLIT_TYPES = [
     "括号", "中文顿号", "数字顿号", "数字空格",
     "数字条", "数字章", "数字节",
     "数字点", "数字点点", "数字直连中文",
+    "文书类型",
     "中文是", "要素数字冒号",
 ]
 
@@ -240,6 +241,10 @@ def analyze(text):
             entry["group_count"] = gc
             entry["scalar_groups"] = groups_detail
 
+        # 文书类型特殊处理：无序数特征，每个出现即一组
+        if name == "文书类型" and entry["count"] > 0:
+            entry["group_count"] = entry["count"]
+
         # 元组序数分析：按前缀分组，每组独立判断
         tuple_ords = [o for o in ordinals if isinstance(o, tuple)]
         if tuple_ords:
@@ -269,9 +274,16 @@ def analyze(text):
     # ---- 数字点/数字点点在条内抑制 ----
     # 若数字点/数字点点的大部分匹配落在条/数字条的区间内，
     # 说明它们只是条内的子编号，不应作为独立拆分类型。
+    # 前置条件：条/数字条本身必须成组（max_n >= 3），
+    # 否则只是法规引用等杂散匹配，不应抑制数字点。
     tiao_positions = []
-    for tname in ["条", "数字条"]:
-        tiao_positions.extend(results[tname].get("positions", []))
+    tiao_has_spine = any(
+        results[tname].get("max_n", 0) >= 3
+        for tname in ["条", "数字条"]
+    )
+    if tiao_has_spine:
+        for tname in ["条", "数字条"]:
+            tiao_positions.extend(results[tname].get("positions", []))
     if tiao_positions:
         tiao_positions.sort(key=lambda x: x[0])
         tiao_spans = []
@@ -697,6 +709,11 @@ def print_report(results, text="", law_id=None, quiet=False):
             and e["max_n"] >= 2):
             qualifying["中文顿号"] = {"max_n": e["max_n"], "group_count": e["group_count"]}
 
+    # 文书类型特殊规则：count>=3 即推荐，count 即组数
+    e_wslx = results.get("文书类型")
+    if e_wslx and not e_wslx.get("suppressed", False) and e_wslx["count"] >= 3:
+        qualifying["文书类型"] = {"max_n": 0, "group_count": e_wslx["count"]}
+
     # ---- 定性 ----
     _p("\n" + "=" * 72)
     _p("  定性判断")
@@ -779,6 +796,14 @@ def print_report(results, text="", law_id=None, quiet=False):
             expanded.append(t)
     if expanded:
         all_tags = sorted(set(all_tags) | set(expanded))
+
+    # ---- 数字直连中文无门槛补加 ----
+    # 当推荐类型仅限于数字点/数字点点时，数字直连中文无门槛加入
+    _dot_only = {t for t in all_tags if t not in ("纯文本", "纯文本段落拆分")}
+    if _dot_only and _dot_only <= {"数字点", "数字点点"}:
+        zlz_entry = results.get("数字直连中文")
+        if zlz_entry and zlz_entry["count"] > 0:
+            all_tags = sorted(set(all_tags) | {"数字直连中文"})
 
     _p(f"\n  >>> 推荐拆分类型: {all_tags}")
     if spine_types:
