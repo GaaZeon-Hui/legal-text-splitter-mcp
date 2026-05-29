@@ -1124,10 +1124,13 @@ def clean_html(raw_text):
               .replace("&amp;", "&")
               .replace("&lt;", "<")
               .replace("&gt;", ">"))
-    # 短横序数规范化：部分数据库用 -、替代中文 "一、" 作为枚举标记
+    # 短横序数规范化：部分数据库用 -、或 —、替代中文 "一、" 作为枚举标记
     txt = txt.replace("（-）", "（一）")
     txt = txt.replace("(-)", "(一)")
     txt = txt.replace("-、", "一、")
+    txt = txt.replace("（—）", "（一）")
+    txt = txt.replace("(—)", "(一)")
+    txt = txt.replace("—、", "一、")
     txt = re.sub(r"\s+", " ", txt).strip()
     return txt
 
