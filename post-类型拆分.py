@@ -1118,12 +1118,16 @@ def get_law_text_from_db(law_id):
         conn.close()
 
 def clean_html(raw_text):
-    """数据库原文清洗：去标签、解常见实体、压缩空白。"""
+    """数据库原文清洗：去标签、解常见实体、规范短横序数、压缩空白。"""
     txt = re.sub(r"<[^>]+>", "", raw_text)
     txt = (txt.replace("&nbsp;", " ")
               .replace("&amp;", "&")
               .replace("&lt;", "<")
               .replace("&gt;", ">"))
+    # 短横序数规范化：部分数据库用 -、替代中文 "一、" 作为枚举标记
+    txt = txt.replace("（-）", "（一）")
+    txt = txt.replace("(-)", "(一)")
+    txt = txt.replace("-、", "一、")
     txt = re.sub(r"\s+", " ", txt).strip()
     return txt
 
