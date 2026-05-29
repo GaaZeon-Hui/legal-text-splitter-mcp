@@ -298,27 +298,36 @@ def build_type_patterns(types_list):
 
 LEFT_BRACKETS = set('\u2018\u201c\u300c\u300e\u300a\u3008\uff08[(\u3014\uff62\u3001\uff0c')
 
-SKIP_DANZI = set('过见')
+SKIP_DANZI = set('过见第单')
 
 SKIP_CIYU = {'超过', '至少'}
 
 
 
 def _skip_danzi(name, m):
-
-    """跳过前面（允许空白）有指定单字符集合中字符的匹配。"""
-
+    """跳过前面（允许空白）有指定单字符集合中字符的匹配。
+    特殊处理：如果该字符是 '见' 且其前紧邻 '意'（忽略空白），则不跳过。
+    """
     if m.start() == 0:
-
         return False
 
     j = m.start() - 1
-
     while j >= 0 and m.string[j] in " \t\n\r\u3000\u00a0":
-
         j -= 1
 
-    return j >= 0 and m.string[j] in SKIP_DANZI
+    if j < 0 or m.string[j] not in SKIP_DANZI:
+        return False
+
+    # 特例：当跳过集合中的字符是 '见' 时，再往前看一个非空白字符
+    if m.string[j] == '见':
+        k = j - 1
+        while k >= 0 and m.string[k] in " \t\n\r\u3000\u00a0":
+            k -= 1
+        # 若前面紧挨着 '意'，说明是“意见”，不跳过
+        if k >= 0 and m.string[k] == '意':
+            return False
+
+    return True
 
 def _skip_ciyu(name, m):
 
@@ -432,32 +441,33 @@ def _di_prefix_filter(name, m):
 
 _RGUARD_RBRACK = set('\u2019\u201d\u300d\u300f\u300b\u3009\uff09])\u3015\uff63')
 
-
+_RBRACK_TO_LBRACK = {
+    ')': '(', ']': '[',
+    '\u2019': '\u2018',
+    '\u201d': '\u201c',
+    '\u300d': '\u300c',
+    '\u300f': '\u300e',
+    '\u300b': '\u300a',
+    '\u3009': '\u3008',
+    '\uff09': '\uff08',
+    '\u3015': '\u3014',
+    '\uff63': '\uff62',
+}
 
 def _post_match_guard(name, m):
-
-    """\u6570\u5b57\u7a7a\u683c/\u6570\u5b57\u76f4\u8fde\u4e2d\u6587 \u53f3\u62ec\u53f7+\u6761\u7ae0\u5b88\u536b\u3002"""
-
+    """\u53f3\u770b5\u5b57\u7b26\uff1a\u5b64\u7acb\u53f3\u62ec\u53f7/\u53f3\u5f15\u53f7\u62e6\u622a\uff0c\u5de6\u53f3\u914d\u5bf9\u7684\u4e0d\u62e6\u3002"""
     if name not in ("\u6570\u5b57\u70b9", "\u6570\u5b57\u70b9\u70b9", "\u6570\u5b57\u76f4\u8fde\u4e2d\u6587"):
-
         return False
-
     if m.end() < len(m.string):
-
-        after = m.string[m.end():m.end()+5]
-
-        if any(c in _RGUARD_RBRACK for c in after):
-
-            return True
-
+        after5 = m.string[m.end():m.end()+5]
+        for i, ch in enumerate(after5):
+            lb = _RBRACK_TO_LBRACK.get(ch)
+            if lb and lb not in after5[:i]:
+                return True
     if m.end() < len(m.string):
-
         after = m.string[m.end():].lstrip()
-
-        if after.startswith(("\u6761", "\u7ae0")):
-
+        if after.startswith(("\u6761", "\u7ae0","\u8282")):
             return True
-
     return False
 
 
