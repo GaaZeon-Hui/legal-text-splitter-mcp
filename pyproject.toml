@@ -17,5 +17,15 @@ dependencies = [
 [project.scripts]
 legal-text-splitter-mcp = "legal_text_splitter.server:main"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
