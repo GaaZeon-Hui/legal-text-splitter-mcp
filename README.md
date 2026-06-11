@@ -6,6 +6,16 @@
 
 在分支中有非mcp的版本，用nicegui做的界面方便使用~
 
+## 需要安装的依赖
+
+MCP 服务（master 分支）
+
+pip install mcp openpyxl pymysql
+
+UI 应用（UI-launch 分支）
+
+pip install nicegui fastapi uvicorn httpx openpyxl chardet python-docx pymysql
+
 ## 功能
 
 | 工具 | 说明 | 需要数据库 |
