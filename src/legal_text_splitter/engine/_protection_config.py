@@ -80,7 +80,7 @@ FJ1_PATTERN = re.compile(r'附\s*\d+')
 TONGYI_PATTERN = re.compile(r'统\s*一')
 # 合一（防 合一、中一、被误识别为中文顿号）
 HEYI_PATTERN = re.compile(r'合\s*一')
-JUNYI_PATTERN = re.compile(r'均\s*一')
+BUYI_PATTERN = re.compile(r'不\s*一')
 # 数字+毫米单位（如 5mm、10.5mm）
 MM_PATTERN = re.compile(r'\d+(?:\.\d+)?\s*mm')
 TEMP_C_PATTERN = re.compile(r'-?\d+(?:\.\d+)?\s*(?:°C|℃)')
@@ -130,7 +130,7 @@ TAI_PATTERN = re.compile(
 # 数字顿号序列（如 1、2、3、4、5）
 DIGIT_ENUM_PATTERN = re.compile(r'\d+(?:、\s*\d+)+')
 # 中文顿号序列（如 一、二、三、四、五）
-CN_ENUM_PATTERN = re.compile(r'[一二三四五六七八九十]+(?:、\s*[一二三四五六七八九十]+)+')
+##CN_ENUM_PATTERN = re.compile(r'[一二三四五六七八九十]+(?:、\s*[一二三四五六七八九十]+)+')
 # 第一、第二、第三、第 等带第前缀的完整/不完整中文序列
 DI_ENUM_PATTERN = re.compile(r'第[一二三四五六七八九十]+(?:、第[一二三四五六七八九十]+)*、第')
 # x级（如 1级、2级）
@@ -152,9 +152,9 @@ DU_PATTERN = re.compile(r'(?<!\d)\d+(?:\.\d+)?\s*度')
 # x份/件/箱/块/位（如 1份、2件、3箱、4块、5位）
 UNIT2_PATTERN = re.compile(r'(?<!\d)\d+\s*[份件箱块位]')
 # 条件x / 条件：x（如 条件1、条件：2）
-CONDITION_PATTERN = re.compile(r'条件[：:]?\s*\d+')
-# 说明x（如 说明1、说明2）
-DESCRIPTION_PATTERN = re.compile(r'说明\s*\d+')
+CONDITION_PATTERN = re.compile(r'条件[：:]?\s*\d+(?!\.)')
+# 说明x
+##DESCRIPTION_PATTERN = re.compile(r'说明\d+(?!\.)')
 # （中文数字）、序列如 （一）、（二）、（三）、
 BRACKET_ENUM_PATTERN = re.compile(r'[（(][一二三四五六七八九十]+[）)](?:、[（(][一二三四五六七八九十]+[）)])+、?')
 # x张（如 1张、2张）
@@ -182,7 +182,7 @@ WEIYI_PATTERN = re.compile(r'唯\s*一')
 # 科目x（如 科目一、科目二、科目1）
 KEMU_PATTERN = re.compile(r'科目[一二三四五六七八九十\d]+')
 # 罗马数字（全角 ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ）
-ROMAN_PATTERN = re.compile(r'(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]+|(?<![A-Za-z])[IVXLCDM]+(?![A-Za-z]))')
+ROMAN_PATTERN = re.compile(r'(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]+|(?<![A-Za-z_])[IVXLCDM]+(?![A-Za-z_]))')
 # 第x列
 LIE_PATTERN = re.compile(r'第\s*\d+\s*列')
 # 第x款
@@ -201,15 +201,29 @@ TAO_PATTERN = re.compile(r'(?<!\d)\d+\s*套')
 PIAN_PATTERN = re.compile(r'(?<!\d)\d+\s*篇')
 TRRILION_PATTERN = re.compile(r'(?<!\d)\d+\s*亿元')
 ZI_PATTERN = re.compile(r'(?<!\d)\d+\s*字')
+LEI_PATTERN = re.compile(r'(?<!\d)\d+\s*类(?!别|型|似|比)')
+MOKUAI_PATTERN = re.compile(r'(?<!\d)\d+\s*模块')
 def apply_protection_blocks(text):
     """在分析前替换非结构性内容为占位符。返回 (protected_text, blocks)。"""
     blocks = []
 
 
 
+    def _buyi_repl(m):
+        blocks.append(m.group(0))
+        return f"___PB_BUYI_{len(blocks)}___"
+    text = BUYI_PATTERN.sub(_buyi_repl, text)
+    def _mokuai_repl(m):
+        blocks.append(m.group(0))
+        return f"___PB_MOKUAI_{len(blocks)}___"
+    text = MOKUAI_PATTERN.sub(_mokuai_repl, text)
+    def _lei_repl(m):
+        blocks.append(m.group(0))
+        return f"___PB_LEI_{len(blocks)}___"
+    text = LEI_PATTERN.sub(_lei_repl, text)
     def _zi_repl(m):
         blocks.append(m.group(0))
-        return f"___PB_TRRILION_{len(blocks)}___"
+        return f"___PB_ZI_{len(blocks)}___"
     text = ZI_PATTERN.sub(_zi_repl, text)
     def _trrilion_repl(m):
         blocks.append(m.group(0))
@@ -484,10 +498,10 @@ def apply_protection_blocks(text):
     text = DIGIT_ENUM_PATTERN.sub(_de_repl, text)
 
     # 中文顿号序列 → 龘___PB_CE_N___
-    def _ce_repl(m):
-        blocks.append(m.group(0))
-        return f"龘___PB_CE_{len(blocks)}___"
-    text = CN_ENUM_PATTERN.sub(_ce_repl, text)
+    ##def _ce_repl(m):
+    ##    blocks.append(m.group(0))
+    ##    return f"龘___PB_CE_{len(blocks)}___"
+    ##text = CN_ENUM_PATTERN.sub(_ce_repl, text)
 
     # 第x序列 → 龘___PB_DI_N___
     def _di_repl(m):
@@ -547,10 +561,10 @@ def apply_protection_blocks(text):
     text = CONDITION_PATTERN.sub(_cond_repl, text)
 
     # 说明x → 龘___PB_DESC_N___
-    def _desc_repl(m):
-        blocks.append(m.group(0))
-        return f"龘___PB_DESC_{len(blocks)}___"
-    text = DESCRIPTION_PATTERN.sub(_desc_repl, text)
+    ##def _desc_repl(m):
+    ##    blocks.append(m.group(0))
+    ##    return f"龘___PB_DESC_{len(blocks)}___"
+    ##text = DESCRIPTION_PATTERN.sub(_desc_repl, text)
 
     # （一）、（二）、（三）、序列 → 龘___PB_BRENUM_N___
     def _brenum_repl(m):
@@ -660,5 +674,5 @@ def _restore_placeholders(text, blocks):
         idx = int(m.group(1)) - 1
         return blocks[idx] if 0 <= idx < len(blocks) else m.group(0)
     text = text.replace('龘', '')
-    text = re.sub(r'___PB_\w+_(\d+)___', _repl, text)
+    text = re.sub(r'___PB_[A-Z0-9]+_(\d+)___', _repl, text)
     return text

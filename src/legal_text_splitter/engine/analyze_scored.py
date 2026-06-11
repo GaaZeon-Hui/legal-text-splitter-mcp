@@ -9,7 +9,7 @@ from _protection_config import apply_protection_blocks
 # 内嵌打分核心（原 score_ords.py，已合并）
 # ======================================================================
 
-BOUNDARY = 6.0
+BOUNDARY = 10.0
 
 def _parse_ord(s):
     return tuple(int(p) for p in s.split('.'))
@@ -24,58 +24,28 @@ def _bigger(a, b):
 def _rel(a, b):
     """亲戚关系判断（内嵌自 score_ords.py）"""
     if a == b: return 0, 0
-    # 兄弟：同前缀，末位差1
-    if len(a) == len(b) and a[:-1] == b[:-1] and abs(a[-1] - b[-1]) == 1:
+    # 兄弟：同前缀，末位递增+1
+    if len(a) == len(b) and a[:-1] == b[:-1] and b[-1] == a[-1] + 1:
         return 1, 3.0
-    # 父子：a 是 b 的父级
-    if len(b) == len(a) + 1 and b[:-1] == a:
+    # 父子：浅层在前(父) → 深层在后(首子)，子末位必为1
+    if len(b) == len(a) + 1 and b[:-1] == a and b[-1] == 1:
         return 2, 2.5
-    if len(a) == len(b) + 1 and a[:-1] == b:
-        return 2, 2.5
-    # 叔侄：a 是 b 的叔叔（a 与 b 的父级是兄弟）
-    if len(a) + 1 == len(b) and a[:-1] == b[:-2] and abs(a[-1] - b[-2]) == 1:
+    # 叔侄：深层在前(侄) → 浅层在后(叔)，叔叔末位 == 侄父级末位 + 1
+    if len(b) + 1 == len(a) and b[:-1] == a[:-2] and b[-1] == a[-2] + 1:
         return 4, 2.0
-    if len(b) + 1 == len(a) and b[:-1] == a[:-2] and abs(b[-1] - a[-2]) == 1:
-        return 4, 2.0
-    # 祖孙
-    if len(b) == len(a) + 2 and b[:-2] == a:
-        return 3, 1.5
-    if len(a) == len(b) + 2 and a[:-2] == b:
-        return 3, 1.5
-    # 祖孙（跨章）：1.1.1 → 2, 7.3.2 → 8
+    # 祖孙（跨章）：深层在前(孙) → 浅层在后(爷)，首位递增+1
     if len(a) >= 3 and len(b) == 1 and a[0] + 1 == b[0]:
         return 3, 1.5
-    if len(b) >= 3 and len(a) == 1 and b[0] + 1 == a[0]:
-        return 3, 1.5
-    # 标量兄弟
-    if len(a) == 1 and len(b) == 1 and abs(a[0] - b[0]) == 1:
+    # 标量兄弟：递增+1
+    if len(a) == 1 and len(b) == 1 and b[0] == a[0] + 1:
         return 1, 3.0
-    # 广义爷孙/祖先：同前缀后深度差亲缘
-    k = 0
-    while k < min(len(a), len(b)) and a[k] == b[k]:
-        k += 1
-    if k > 0:
-        ra = len(a) - k
-        rb = len(b) - k
-        dd = abs(ra - rb)
-        if dd == 2:
-            return 3, 1.5   # 爷孙（深度差2）
-        if dd >= 3:
-            return 5, max(1.5 - 0.25 * (dd - 2), 0.3)  # 祖先
     return 0, 0
 
 def _connected(a, b):
     t, _ = _rel(a, b)
     if t < 1: return False
     if t == 4: return len(a) > len(b)
-    if t == 3 and len(a) >= 3 and len(b) == 1: return True
-    if t == 3:
-        # 直接祖孙：短→长为前进
-        if len(a) + 2 == len(b) and b[:-2] == a: return _smaller(a, b)
-        if len(b) + 2 == len(a) and a[:-2] == b: return _smaller(a, b)
-        # 广义爷孙：深→浅为前进
-        return len(a) > len(b)
-    if t == 5: return len(a) > len(b)  # 祖先
+    if t == 3: return len(a) > len(b)
     return _smaller(a, b)
 
 def score_ordinals(ords):
@@ -110,37 +80,9 @@ def score_ordinals(ords):
                         scores[i+d] += st * (1.0 - (d-1)*0.4) * 0.5
                     else: scores[i] -= st * (1.0 - (d-1)*0.4)
 
-    # Phase 2: 能量传播
-    for _ in range(3):
-        ns = scores[:]
-        for i in range(n):
-            l, r = 0.0, 0.0
-            for d in range(1, min(6, i+1)):
-                j = i - d
-                if scores[j] >= BOUNDARY: break
-                t, st = _rel(parsed[i], parsed[j])
-                if t >= 1:
-                    x = sum(1 for k in range(j+1, i) if scores[k] < BOUNDARY)
-                    if _smaller(parsed[j], parsed[i]):
-                        l += st * (0.6**d) * (0.8**x)
-                    else:
-                        l -= st * (0.6**d) * (0.8**x)
-            for d in range(1, min(6, n-i)):
-                j = i + d
-                if scores[j] >= BOUNDARY: break
-                t, st = _rel(parsed[i], parsed[j])
-                if t >= 1:
-                    x = sum(1 for k in range(i+1, j) if scores[k] < BOUNDARY)
-                    if _bigger(parsed[j], parsed[i]):
-                        r += st * (0.6**d) * (0.8**x)
-                    else:
-                        r -= st * (0.6**d) * (0.8**x)
-            ns[i] = scores[i] + l + r
-        scores = ns
-
     # Phase 3: 连通链检测
     visited = [False] * n
-    chain_reward = [0.0] * n     # 记录每人Phase 3链奖，供Phase 5回滚
+    chain_reward = [0.0] * n     # 记录每人Phase3链奖，供Phase5回滚
     i = 0
     while i < n:
         if visited[i]: i += 1; continue
@@ -152,8 +94,6 @@ def score_ordinals(ords):
                 nxt = cur + skip
                 if nxt >= n: break
                 if _connected(parsed[cur], parsed[nxt]) and all(scores[k] < BOUNDARY for k in range(cur+1, nxt)):
-                    # 跳过中间元素时，若中间元素与目标可直接连接（性质更优），
-                    # 则说明未入链的中间元素更应成为链成员，阻止远距跨越
                     blocked = False
                     for k in range(cur+1, nxt):
                         if _connected(parsed[k], parsed[nxt]):
@@ -189,21 +129,53 @@ def score_ordinals(ords):
             i = j
         else: i += 1
 
-    # Phase 4: 亲戚挤压惩罚
+    # Phase 2: 能量传播（无步数限制，遇 BOUNDARY 即停）
+    for _ in range(3):
+        ns = scores[:]
+        for i in range(n):
+            l, r = 0.0, 0.0
+            for d in range(1, i+1):
+                j = i - d
+                if scores[j] >= BOUNDARY: break
+                t, st = _rel(parsed[i], parsed[j])
+                if t >= 1:
+                    x = sum(1 for k in range(j+1, i) if scores[k] < BOUNDARY)
+                    if _smaller(parsed[j], parsed[i]):
+                        l += st * (0.6**d) * (0.8**x)
+                    else:
+                        l -= st * (0.6**d) * (0.8**x)
+            for d in range(1, n-i):
+                j = i + d
+                if scores[j] >= BOUNDARY: break
+                t, st = _rel(parsed[i], parsed[j])
+                if t >= 1:
+                    x = sum(1 for k in range(i+1, j) if scores[k] < BOUNDARY)
+                    if _bigger(parsed[j], parsed[i]):
+                        r += st * (0.6**d) * (0.8**x)
+                    else:
+                        r -= st * (0.6**d) * (0.8**x)
+            ns[i] = scores[i] + l + r
+        scores = ns
+
+    # Phase 4: 亲戚挤压惩罚（基于Phase2结束后的得分判断连接边）
     for i in range(n):
-        if visited[i]: continue
+        if scores[i] >= BOUNDARY: continue
         li = None
-        for d in range(1, 6):
-            if i-d >= 0 and visited[i-d]: li = i-d; break
+        for d in range(1, i+1):
+            j = i - d
+            if j < 0: break
+            if scores[j] >= BOUNDARY: li = j; break
         ri = None
-        for d in range(1, 6):
-            if i+d < n and visited[i+d]: ri = i+d; break
+        for d in range(1, n-i):
+            j = i + d
+            if j >= n: break
+            if scores[j] >= BOUNDARY: ri = j; break
         if li is not None and ri is not None:
             t, _ = _rel(parsed[li], parsed[ri])
             if t >= 1:
                 gap = ri - li
                 av = (abs(scores[li]) + abs(scores[ri])) / 2
-                scores[i] -= av * ((6 - gap) / 6) * 0.3
+                scores[i] -= av * ((6 - min(gap, 6)) / 6) * 0.3
 
     threshold = 4.0  # 提前定义供 Phase 5 使用
 
@@ -261,6 +233,18 @@ def score_ordinals(ords):
                 scores[idx] -= base_penalty
             i = chain[-1] + 1
 
+    # Phase 6: 夹心噪声清零 — a-b无关系且a-c有关系，或b-c无关系且a-c有关系，则b清零
+    kept_idx = [i for i, s in enumerate(scores) if s >= threshold]
+    for k in range(1, len(kept_idx) - 1):
+        a = kept_idx[k-1]
+        b = kept_idx[k]
+        c = kept_idx[k+1]
+        t_ab, _ = _rel(parsed[a], parsed[b])
+        t_ac, _ = _rel(parsed[a], parsed[c])
+        t_bc, _ = _rel(parsed[b], parsed[c])
+        if t_ac >= 1 and (t_ab < 1 or t_bc < 1):
+            scores[b] = 0.0
+
     kept = [s >= threshold for s in scores]
     return scores, kept
 
@@ -273,7 +257,7 @@ def analyze(text):
     """
     # 打分子集：与拆分引擎 global_backward_rollback + 条二次回卷 的序数入口一致
     SCORED_TYPES = {"条", "数字条", "数字点", "数字点点",
-                    "数字直连中文", "数字空格", "数字节"}
+                    "数字直连中文", "数字节"}
 
     # 1. 保护块 → 全量匹配（一次过，不重复）
     protected, _ = apply_protection_blocks(text)
@@ -379,13 +363,12 @@ if __name__ == '__main__':
         except ImportError:
             print("pymysql 未安装，请执行 pip install pymysql")
             sys.exit(1)
-        import os as _os4db
         DB_CONFIG = {
-            "host": _os4db.environ.get("LEGAL_DB_HOST", "localhost"),
-            "port": int(_os4db.environ.get("LEGAL_DB_PORT", "3306")),
-            "user": _os4db.environ.get("LEGAL_DB_USER", "root"),
-            "password": _os4db.environ.get("LEGAL_DB_PASSWORD", ""),
-            "database": _os4db.environ.get("LEGAL_DB_NAME", "legal_db"),
+            "host": "192.168.1.109",
+            "port": 8001,
+            "user": "xoops_root",
+            "password": "654321",
+            "database": "mtai_serv",
         }
         conn = pymysql.connect(**DB_CONFIG)
         try:
@@ -432,7 +415,7 @@ if __name__ == '__main__':
         kept = collector['_kept_mask']
         print(f"打分序数: {len(ords)} → 保留: {sum(kept)}")
         for i, (o, k, s) in enumerate(zip(ords, kept, scores), start=1):
-            flag = "KEEP" if k else "DROP"
+            flag = "YES" if k else "NO "
             print(f"  {i:>4} {o:<12} {s:>8.1f}  | {flag}")
     else:
         print("(无 SCORED_TYPES 序数被打分)")
